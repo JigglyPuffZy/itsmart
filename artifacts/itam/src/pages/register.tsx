@@ -57,10 +57,6 @@ export default function Register() {
         transition={{ duration: 0.4 }}
         className="w-full max-w-md relative z-10 my-8"
       >
-        <div className="flex justify-center mb-8">
-          <img src="/dostlogo.png" alt="DOST Logo" className="w-20 h-20 object-contain drop-shadow-xl mx-auto" />
-        </div>
-
         <Card className="border-0 shadow-2xl bg-card/80 backdrop-blur-xl">
           <CardHeader className="space-y-2 text-center pb-6">
             <CardTitle className="text-3xl font-display font-bold text-foreground">Create Account</CardTitle>
