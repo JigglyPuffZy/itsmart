@@ -1,40 +1,31 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, useSearch } from "wouter";
-import { useGetTickets, useCreateTicket, useGetSupportStaff, useGetUsers, TicketPriority, TicketType, TICKET_TYPE_LABEL, useGetAssets } from "@/lib/supabase-queries";
+import { useSearch } from "wouter";
+import { useGetTickets, useCreateTicket, useGetUsers, TicketPriority, TicketType, TICKET_TYPE_LABEL, useGetAssets } from "@/lib/supabase-queries";
 import { useAuth } from "@/lib/auth-context";
 import { AppLayout } from "@/components/layout/app-layout";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { PaginationBar } from "@/components/ui/pagination-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Loader2, TicketIcon, X, FilePlus, ChevronsUpDown, Check } from "lucide-react";
-import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
+import { Plus, Loader2, TicketIcon, X, FilePlus, ChevronsUpDown, Check } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { SLABadge } from "@/components/ui/sla-badge";
-import { SkeletonTable } from "@/components/ui/skeleton-table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-
-function formatTicketDate(dateStr: string): { relative: string; full: string } {
-  const d = new Date(dateStr);
-  const full = format(d, 'MMM d, yyyy h:mm a');
-  let relative: string;
-  if (isToday(d)) relative = formatDistanceToNow(d, { addSuffix: true });
-  else if (isYesterday(d)) relative = `Yesterday ${format(d, 'h:mm a')}`;
-  else relative = format(d, 'MMM d, yyyy');
-  return { relative, full };
-}
+import {
+  TicketSummaryStrip,
+  getActiveTicketFilter,
+  applyTicketFilter,
+} from "@/components/tickets/ticket-summary-strip";
+import { TicketInventoryList } from "@/components/tickets/ticket-inventory-list";
+import { TicketToolbar } from "@/components/tickets/ticket-toolbar";
 
 const PAGE_SIZE = 25;
 
@@ -46,19 +37,6 @@ const STATUS_LABEL: Record<string, string> = {
   open: 'Open', in_progress: 'In Progress', on_hold: 'On Hold',
   resolved: 'Resolved', closed: 'Closed',
 };
-
-function getRowHighlight(status: string, priority: string): string {
-  if (status === 'closed')      return 'bg-gray-100/60 dark:bg-gray-800/20 hover:bg-gray-100/80 dark:hover:bg-gray-800/30';
-  if (status === 'resolved')    return 'bg-green-50/70 dark:bg-green-900/10 hover:bg-green-50 dark:hover:bg-green-900/20';
-  if (status === 'in_progress') return 'bg-blue-50/70 dark:bg-blue-900/10 hover:bg-blue-50 dark:hover:bg-blue-900/20';
-  if (status === 'on_hold')     return 'bg-neutral-200/60 dark:bg-neutral-700/20 hover:bg-neutral-200/80 dark:hover:bg-neutral-700/30';
-  if (status === 'open') {
-    if (priority === 'high' || priority === 'critical')
-      return 'bg-orange-50/70 dark:bg-orange-900/10 hover:bg-orange-50 dark:hover:bg-orange-900/20';
-    return 'bg-yellow-50/70 dark:bg-yellow-900/10 hover:bg-yellow-50 dark:hover:bg-yellow-900/20';
-  }
-  return 'hover:bg-muted/30';
-}
 
 const createTicketSchema = z.object({
   title: z.string().trim().min(1, "Title is required"),
@@ -135,7 +113,6 @@ export default function TicketsList() {
   }, [searchString]);
 
   const { data: assets } = useGetAssets();
-  const { data: supportStaff } = useGetSupportStaff();
   // All assignable staff — support staff + administrators, sorted by name
   const { data: allUsers } = useGetUsers();
   const assignableStaff = (allUsers ?? [])
@@ -158,6 +135,18 @@ export default function TicketsList() {
 
   const { data, isLoading } = useGetTickets({ query: queryFilters });
 
+  // Queue mix uses scope-only data — not narrowed by status, priority, or search
+  const summaryQueryFilters: Record<string, string> = {};
+  if (isAdmin && assigneeFilter !== "all" && assigneeFilter !== "unassigned") {
+    summaryQueryFilters.assignedTo = assigneeFilter;
+  }
+  if (scope === "mine") {
+    if (isAdmin && assigneeFilter === "all") summaryQueryFilters.assignedTo = user?.id ?? "";
+    else if (!isAdmin && !isSupport) summaryQueryFilters.createdBy = user?.id ?? "";
+    else if (isSupport) summaryQueryFilters.assignedTo = user?.id ?? "";
+  }
+  const { data: summaryData } = useGetTickets({ query: summaryQueryFilters });
+
   // Reset to page 1 when filters change
   useEffect(() => { setPage(1); }, [search, statusFilter, resolvedClosed, priorityFilter, assigneeFilter, scope]);
 
@@ -173,6 +162,29 @@ export default function TicketsList() {
     return base;
   }, [data, isAdmin, assigneeFilter, resolvedClosed]);
   const pagedTickets = allTickets.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const baseForSummary = useMemo(() => {
+    let base = summaryData?.data ?? [];
+    if (isAdmin && assigneeFilter === "unassigned") {
+      base = base.filter((t) => !t.assignedTo);
+    }
+    return base;
+  }, [summaryData, isAdmin, assigneeFilter]);
+
+  const summary = useMemo(
+    () => ({
+      total: baseForSummary.length,
+      open: baseForSummary.filter((t) => t.status === "open").length,
+      inProgress: baseForSummary.filter((t) => t.status === "in_progress").length,
+      onHold: baseForSummary.filter((t) => t.status === "on_hold").length,
+      resolvedClosed: baseForSummary.filter(
+        (t) => t.status === "resolved" || t.status === "closed"
+      ).length,
+    }),
+    [baseForSummary]
+  );
+
+  const activeStatusFilter = getActiveTicketFilter(statusFilter, resolvedClosed);
 
   const form = useForm<z.infer<typeof createTicketSchema>>({
     resolver: zodResolver(createTicketSchema),
@@ -200,344 +212,283 @@ export default function TicketsList() {
 
   const hasActiveFilters = statusFilter !== "all" || resolvedClosed || priorityFilter !== "all" || (isAdmin && assigneeFilter !== "all") || search;
 
+  const handleStripFilter = (filter: ReturnType<typeof getActiveTicketFilter>) => {
+    const next = applyTicketFilter(filter);
+    setStatusFilter(next.statusFilter);
+    setResolvedClosed(next.resolvedClosed);
+  };
+
+  const scopeLabel =
+    scope === "mine"
+      ? isSupport
+        ? "Tickets assigned to you"
+        : "Tickets you submitted"
+      : "Organization-wide support queue";
+
+  const typeLabels = Object.fromEntries(
+    Object.values(TicketType).map((t) => [t, TICKET_TYPE_LABEL[t]])
+  );
+
   return (
     <AppLayout>
-      <div className="space-y-4">
-        {/* Page header: scope toggle aligned with header title */}
-        {!isAdmin && (
-          <div className="flex justify-end">
-            <div className="flex rounded-xl border border-border/50 overflow-hidden h-9">
-              <button
-                onClick={() => setScope("mine")}
-                className={`px-4 text-sm font-medium transition-colors ${scope === "mine" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted"}`}
-              >
-                {isSupport ? "Assigned to Me" : "My Tickets"}
-              </button>
-              <button
-                onClick={() => setScope("all")}
-                className={`px-4 text-sm font-medium transition-colors ${scope === "all" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted"}`}
-              >
-                All Tickets
-              </button>
-            </div>
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="app-page-eyebrow">IT Service Desk</p>
+            <h1 className="app-page-title mt-1">
+              Support <span className="text-primary">tickets</span>
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {scopeLabel}
+              {!isLoading && (
+                <span className="font-medium text-foreground">
+                  {" "}
+                  · {allTickets.length} ticket{allTickets.length === 1 ? "" : "s"}
+                </span>
+              )}
+            </p>
           </div>
-        )}
 
-        {/* Top bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-
-          {/* Search + New Ticket */}
-          <div className="flex items-center gap-2 w-full max-w-xl">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by title, ticket no., or requester..."
-                value={search}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSearch(val);
-                  if (val) {
-                    setStatusFilter("all");
-                    setResolvedClosed(false);
-                    setPriorityFilter("all");
-                    if (!isAdmin) setScope("all");
-                  }
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-2xl border border-border/50 bg-white/70 p-1 shadow-sm backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setScope("mine");
+                  if (isAdmin) setAssigneeFilter("all");
                 }}
-                className="pl-9 h-10 rounded-xl bg-card border-border/50 shadow-sm text-sm"
-              />
+                className={`rounded-xl px-4 py-2 text-xs font-semibold transition-all ${scope === "mine" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {isSupport ? "Assigned to me" : "My tickets"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope("all")}
+                className={`rounded-xl px-4 py-2 text-xs font-semibold transition-all ${scope === "all" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                All tickets
+              </button>
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="h-10 rounded-xl bg-primary hover:bg-primary/90 shadow-md shadow-primary/20 shrink-0">
-                  <Plus className="w-4 h-4 mr-2" /> New Ticket
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[550px] p-0 border-0 shadow-2xl rounded-2xl">
-                <div className="px-6 py-6 bg-muted/30 border-b border-border">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl font-display">Create Support Ticket</DialogTitle>
-                    <DialogDescription>Describe your issue or request.</DialogDescription>
-                  </DialogHeader>
-                </div>
-                <div className="p-6">
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-                      <FormField control={form.control} name="title" render={({ field }) => (
-                        <FormItem><FormLabel>Summary</FormLabel><FormControl><Input placeholder="Brief title of the issue" {...field} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
-                      )} />
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField control={form.control} name="priority" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Priority</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger></FormControl>
-                              <SelectContent>
-                                {Object.values(TicketPriority).map(p => <SelectItem key={p} value={p}>{PRIORITY_LABEL[p]}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
+                <DialogTrigger asChild>
+                  <Button className="h-9 rounded-xl shadow-sm">
+                    <Plus className="w-4 h-4 mr-1.5" /> New ticket
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[550px] p-0 border-0 shadow-2xl rounded-2xl overflow-hidden">
+                  <div className="relative px-6 py-6 border-b border-border overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.08] via-transparent to-accent/[0.06]" />
+                    <DialogHeader className="relative">
+                      <div className="flex items-center gap-3 mb-1">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                          <FilePlus className="h-5 w-5" />
+                        </div>
+                        <DialogTitle className="text-2xl font-display">Create support ticket</DialogTitle>
+                      </div>
+                      <DialogDescription className="pl-[52px]">
+                        Describe your issue or request and our team will respond promptly.
+                      </DialogDescription>
+                    </DialogHeader>
+                  </div>
+                  <div className="p-6 max-h-[70vh] overflow-y-auto">
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                        <FormField control={form.control} name="title" render={({ field }) => (
+                          <FormItem><FormLabel>Summary</FormLabel><FormControl><Input placeholder="Brief title of the issue" {...field} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
                         )} />
-                        <FormField control={form.control} name="type" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Type</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger></FormControl>
-                              <SelectContent>
-                                {Object.values(TicketType).map(t => <SelectItem key={t} value={t}>{TICKET_TYPE_LABEL[t]}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                        <FormField control={form.control} name="assetId" render={({ field }) => (
-                          <FormItem className="col-span-2">
-                            <FormLabel>Related Asset (Optional)</FormLabel>
-                            <Popover open={assetComboOpen} onOpenChange={setAssetComboOpen}>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    className={cn("w-full rounded-xl justify-between font-normal h-10", !field.value && "text-muted-foreground")}
-                                  >
-                                    {field.value
-                                      ? (() => { const a = assets?.data?.find(a => a.id === field.value); return a ? `${a.name} (${a.assetTag})` : "Select asset..."; })()
-                                      : "None — search by name, tag, or category"}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-xl" align="start">
-                                <Command>
-                                  <CommandInput placeholder="Search by name, tag, or category..." className="h-9" />
-                                  <CommandList>
-                                    <CommandEmpty>No assets found.</CommandEmpty>
-                                    <CommandGroup>
-                                      <CommandItem
-                                        value="none"
-                                        onSelect={() => { field.onChange(null); setAssetComboOpen(false); }}
-                                        className="text-muted-foreground"
-                                      >
-                                        <Check className={cn("mr-2 h-4 w-4", !field.value ? "opacity-100" : "opacity-0")} />
-                                        None
-                                      </CommandItem>
-                                      {assets?.data?.map(a => (
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField control={form.control} name="priority" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Priority</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  {Object.values(TicketPriority).map(p => <SelectItem key={p} value={p}>{PRIORITY_LABEL[p]}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name="type" render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Type</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger></FormControl>
+                                <SelectContent>
+                                  {Object.values(TicketType).map(t => <SelectItem key={t} value={t}>{TICKET_TYPE_LABEL[t]}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField control={form.control} name="assetId" render={({ field }) => (
+                            <FormItem className="col-span-2">
+                              <FormLabel>Related asset (optional)</FormLabel>
+                              <Popover open={assetComboOpen} onOpenChange={setAssetComboOpen}>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      className={cn("w-full rounded-xl justify-between font-normal h-10", !field.value && "text-muted-foreground")}
+                                    >
+                                      {field.value
+                                        ? (() => { const a = assets?.data?.find(a => a.id === field.value); return a ? `${a.name} (${a.assetTag})` : "Select asset..."; })()
+                                        : "None — search by name, tag, or category"}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-xl" align="start">
+                                  <Command>
+                                    <CommandInput placeholder="Search by name, tag, or category..." className="h-9" />
+                                    <CommandList>
+                                      <CommandEmpty>No assets found.</CommandEmpty>
+                                      <CommandGroup>
                                         <CommandItem
-                                          key={a.id}
-                                          value={`${a.name} ${a.assetTag} ${a.category}`}
-                                          onSelect={() => { field.onChange(a.id); setAssetComboOpen(false); }}
+                                          value="none"
+                                          onSelect={() => { field.onChange(null); setAssetComboOpen(false); }}
+                                          className="text-muted-foreground"
                                         >
-                                          <Check className={cn("mr-2 h-4 w-4", field.value === a.id ? "opacity-100" : "opacity-0")} />
-                                          <span className="font-medium">{a.name}</span>
-                                          <span className="ml-1.5 text-muted-foreground text-xs">({a.assetTag})</span>
+                                          <Check className={cn("mr-2 h-4 w-4", !field.value ? "opacity-100" : "opacity-0")} />
+                                          None
                                         </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
+                                        {assets?.data?.map(a => (
+                                          <CommandItem
+                                            key={a.id}
+                                            value={`${a.name} ${a.assetTag} ${a.category}`}
+                                            onSelect={() => { field.onChange(a.id); setAssetComboOpen(false); }}
+                                          >
+                                            <Check className={cn("mr-2 h-4 w-4", field.value === a.id ? "opacity-100" : "opacity-0")} />
+                                            <span className="font-medium">{a.name}</span>
+                                            <span className="ml-1.5 text-muted-foreground text-xs">({a.assetTag})</span>
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                        </div>
+                        <FormField control={form.control} name="description" render={({ field }) => (
+                          <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Detailed explanation..." {...field} className="rounded-xl min-h-[120px]" /></FormControl><FormMessage /></FormItem>
                         )} />
-                      </div>
-                      <FormField control={form.control} name="description" render={({ field }) => (
-                        <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Detailed explanation..." {...field} className="rounded-xl min-h-[120px]" /></FormControl><FormMessage /></FormItem>
-                      )} />
-                      <div className="pt-4 flex justify-end gap-3">
-                        <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl">Cancel</Button>
-                        {createSuccess ? (
-                          <Button disabled className="rounded-xl bg-emerald-600 text-white gap-2">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                            Ticket Submitted!
-                          </Button>
-                        ) : (
-                          <Button type="submit" disabled={createMutation.isPending} className="rounded-xl shadow-md shadow-primary/20">
-                            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Submit Ticket
-                          </Button>
-                        )}
-                      </div>
-                    </form>
-                  </Form>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Filters */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Select value={resolvedClosed ? "resolved_closed" : statusFilter} onValueChange={v => {
-              if (v === "resolved_closed") {
-                setResolvedClosed(true);
-                setStatusFilter("all");
-              } else {
-                setResolvedClosed(false);
-                setStatusFilter(v);
-              }
-            }}>
-              <SelectTrigger className="h-10 w-[160px] rounded-xl text-sm border-border/50">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {Object.keys(STATUS_LABEL).map(s => (
-                  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
-                ))}
-                <SelectItem value="resolved_closed">Resolved & Closed</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="h-10 w-[140px] rounded-xl text-sm border-border/50">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
-                {Object.values(TicketPriority).map(p => (
-                  <SelectItem key={p} value={p}>{PRIORITY_LABEL[p]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {isAdmin && (
-              <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-                <SelectTrigger className="h-10 w-[160px] rounded-xl text-sm border-border/50">
-                  <SelectValue placeholder="Assigned To" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Assignees</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {assignableStaff.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.fullName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" className="h-10 px-3 rounded-xl text-muted-foreground"
-                onClick={() => { setSearch(""); setStatusFilter("all"); setResolvedClosed(false); setPriorityFilter("all"); setAssigneeFilter("all"); }}>
-                <X className="w-4 h-4 mr-1" /> Clear
-              </Button>
-            )}
+                        <div className="pt-4 flex justify-end gap-3 border-t border-border/50">
+                          <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl">Cancel</Button>
+                          {createSuccess ? (
+                            <Button disabled className="rounded-xl bg-emerald-600 text-white gap-2">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                              Ticket submitted
+                            </Button>
+                          ) : (
+                            <Button type="submit" disabled={createMutation.isPending} className="rounded-xl">
+                              {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Submit ticket
+                            </Button>
+                          )}
+                        </div>
+                      </form>
+                    </Form>
+                  </div>
+                </DialogContent>
+              </Dialog>
           </div>
         </div>
 
-        {/* Active filter chips */}
-        {hasActiveFilters && (
-          <div className="flex gap-2 flex-wrap">
-            {search && <Badge variant="secondary" className="rounded-lg">Search: "{search}"</Badge>}
-            {resolvedClosed && <Badge variant="secondary" className="rounded-lg">Status: Resolved &amp; Closed</Badge>}
-            {!resolvedClosed && statusFilter !== "all" && <Badge variant="secondary" className="rounded-lg">Status: {STATUS_LABEL[statusFilter]}</Badge>}
-            {priorityFilter !== "all" && <Badge variant="secondary" className="rounded-lg">Priority: {PRIORITY_LABEL[priorityFilter]}</Badge>}
-            {isAdmin && assigneeFilter !== "all" && (
-              <Badge variant="secondary" className="rounded-lg">
-                Assigned To: {assigneeFilter === "unassigned" ? "Unassigned" : assignableStaff.find(s => s.id === assigneeFilter)?.fullName ?? assigneeFilter}
-              </Badge>
+        {/* Split layout: queue sidebar + ticket list */}
+        <div className="grid gap-5 lg:grid-cols-[minmax(240px,280px)_1fr] lg:items-start">
+          <TicketSummaryStrip
+            {...summary}
+            activeFilter={activeStatusFilter}
+            onFilter={handleStripFilter}
+          />
+
+          <div className="min-w-0 space-y-4">
+            <TicketToolbar
+              search={search}
+              onSearchChange={(val) => {
+                setSearch(val);
+                if (val) {
+                  setStatusFilter("all");
+                  setResolvedClosed(false);
+                  setPriorityFilter("all");
+                  if (!isAdmin) setScope("all");
+                }
+              }}
+              priorityFilter={priorityFilter}
+              onPriorityChange={setPriorityFilter}
+              assigneeFilter={assigneeFilter}
+              onAssigneeChange={setAssigneeFilter}
+              assignableStaff={assignableStaff}
+              isAdmin={isAdmin}
+              hasActiveFilters={Boolean(hasActiveFilters)}
+              onClearFilters={() => {
+                setSearch("");
+                setStatusFilter("all");
+                setResolvedClosed(false);
+                setPriorityFilter("all");
+                setAssigneeFilter("all");
+              }}
+            />
+
+            {isLoading ? (
+              <div className="space-y-2 rounded-3xl border border-white/60 bg-white/60 p-2">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-[72px] rounded-xl bg-muted/40 animate-pulse" />
+                ))}
+              </div>
+            ) : !allTickets.length ? (
+              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-white/75 p-16 text-center shadow-sm">
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/[0.08] ring-1 ring-primary/15">
+                  <TicketIcon className="h-8 w-8 text-primary/60" />
+                </div>
+                <h3 className="mb-1.5 font-display text-lg font-semibold text-foreground">
+                  {hasActiveFilters ? "No matching tickets" : "No tickets yet"}
+                </h3>
+                <p className="mb-6 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                  {hasActiveFilters
+                    ? "Try adjusting your search or clearing the filters to see more results."
+                    : isAdmin || isSupport
+                      ? "No support tickets have been submitted yet. New requests will appear here."
+                      : "You haven't submitted any support tickets yet. Create one to get help from the IT team."}
+                </p>
+                {!hasActiveFilters && (
+                  <Button className="gap-2 rounded-xl" onClick={() => setIsDialogOpen(true)}>
+                    <FilePlus className="h-4 w-4" /> Create ticket
+                  </Button>
+                )}
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    className="gap-2 rounded-xl"
+                    onClick={() => {
+                      setSearch("");
+                      setStatusFilter("all");
+                      setResolvedClosed(false);
+                      setPriorityFilter("all");
+                      setAssigneeFilter("all");
+                    }}
+                  >
+                    <X className="h-4 w-4" /> Clear all filters
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <>
+                <TicketInventoryList
+                  tickets={pagedTickets as any}
+                  total={allTickets.length}
+                  typeLabels={typeLabels}
+                />
+                <div className="overflow-hidden rounded-2xl border border-border/50 bg-white/70 shadow-sm">
+                  <PaginationBar page={page} pageSize={PAGE_SIZE} total={allTickets.length} onPage={setPage} />
+                </div>
+              </>
             )}
           </div>
-        )}
-
-        {/* Table */}
-        <div className="bg-card rounded-2xl shadow-lg shadow-black/5 border border-border/50 overflow-hidden">
-          {isLoading ? (
-            <SkeletonTable rows={6} cols={7} />
-          ) : !allTickets.length ? (
-            <div className="p-16 flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-4">
-                <TicketIcon className="w-10 h-10 text-muted-foreground/50" />
-              </div>
-              <h3 className="text-xl font-bold text-foreground mb-2">
-                {hasActiveFilters ? "No tickets match your filters" : "No tickets yet"}
-              </h3>
-              <p className="text-muted-foreground text-sm mb-6 max-w-xs">
-                {hasActiveFilters
-                  ? "Try adjusting your filters or clearing the search."
-                  : isAdmin || isSupport
-                  ? "No support tickets have been submitted yet."
-                  : "You haven't submitted any support tickets yet. Create one to get help from the IT team."}
-              </p>
-              {!hasActiveFilters && !isAdmin && (
-                <Button className="rounded-xl gap-2" onClick={() => setIsDialogOpen(true)}>
-                  <FilePlus className="w-4 h-4" /> Create First Ticket
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-muted/30">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="font-semibold text-foreground/80 py-4 px-6">Ticket</TableHead>
-                    <TableHead className="font-semibold text-foreground/80">Status & Priority</TableHead>
-                    <TableHead className="font-semibold text-foreground/80">SLA</TableHead>
-                    <TableHead className="font-semibold text-foreground/80">Requester</TableHead>
-                    <TableHead className="font-semibold text-foreground/80">Assigned To</TableHead>
-                    <TableHead className="font-semibold text-foreground/80">Created</TableHead>
-                    <TableHead className="font-semibold text-foreground/80 text-right px-6">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagedTickets.map((ticket) => (
-                    <TableRow key={ticket.id} className={`transition-colors group ${getRowHighlight(ticket.status, ticket.priority)}`}>
-                      <TableCell className="px-6 py-4">
-                        <div className="flex flex-col max-w-[280px]">
-                          <span className="font-semibold text-foreground truncate" title={ticket.title}>{ticket.title}</span>
-                          <span className="text-xs text-muted-foreground font-mono mt-1">{(ticket as any).ticketNumber ?? `#${ticket.id.substring(0, 8)}`}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col items-start gap-1.5">
-                          <StatusBadge status={ticket.status === 'open' && (ticket.priority === 'high' || ticket.priority === 'critical') ? 'open_urgent' : ticket.status} />
-                          <StatusBadge status={ticket.priority} />
-                          {(ticket as any).type && (ticket as any).type !== 'other' && (
-                            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-md border border-border/50">
-                              {TICKET_TYPE_LABEL[(ticket as any).type] ?? (ticket as any).type}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <SLABadge variant="compact" priority={ticket.priority} createdAt={ticket.createdAt} resolvedAt={(ticket as any).resolvedAt} closedAt={(ticket as any).closedAt} ticketStatus={ticket.status} totalHoldSeconds={(ticket as any).totalHoldSeconds} onHoldAt={(ticket as any).onHoldAt} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-accent/10 text-accent flex items-center justify-center text-xs font-bold">
-                            {ticket.createdBy.fullName.charAt(0)}
-                          </div>
-                          <span className="text-sm font-medium">{ticket.createdBy.fullName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {ticket.assignedTo ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
-                              {ticket.assignedTo.fullName.charAt(0)}
-                            </div>
-                            <span className="text-sm font-medium">{ticket.assignedTo.fullName}</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {(() => { const { relative, full } = formatTicketDate(ticket.createdAt); return <span title={full}>{relative}</span>; })()}
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                        <Link href={`/tickets/${ticket.id}`}>
-                          <Button variant="outline" size="sm" className="rounded-lg shadow-sm hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all">
-                            View
-                          </Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <PaginationBar page={page} pageSize={PAGE_SIZE} total={allTickets.length} onPage={setPage} />
-            </div>
-          )}
         </div>
       </div>
     </AppLayout>

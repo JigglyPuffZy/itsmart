@@ -10,11 +10,19 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, ArrowLeft, Send, MessageSquare, Clock, ShieldAlert, MonitorSmartphone, UserCheck, AlertTriangle, Star, Copy, Check, Printer } from "lucide-react";
+import { Loader2, ArrowLeft, Send, MessageSquare, Clock, ShieldAlert, MonitorSmartphone, UserCheck, AlertTriangle, Star, Copy, Check, Printer, TicketIcon, History } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { SLABadge } from "@/components/ui/sla-badge";
+import { cn } from "@/lib/utils";
+
+function priorityStripe(priority: string) {
+  if (priority === "critical") return "bg-red-500";
+  if (priority === "high") return "bg-amber-500";
+  if (priority === "medium") return "bg-sky-500";
+  return "bg-slate-300";
+}
 
 type Role = 'administrator' | 'support_staff' | 'general_user';
 
@@ -279,16 +287,58 @@ export default function TicketDetail() {
     return () => window.removeEventListener('keydown', handler);
   }, [pendingStatus, pendingPriority]);
 
-  if (isLoading) return <AppLayout><div className="flex h-64 items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div></AppLayout>;
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="space-y-6 max-w-6xl mx-auto animate-pulse">
+          <div className="h-5 w-32 rounded bg-muted/60" />
+          <div className="rounded-2xl border border-border/40 overflow-hidden">
+            <div className="h-1.5 w-full bg-muted/80" />
+            <div className="p-6 md:p-8 space-y-4">
+              <div className="flex gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-muted/60" />
+                <div className="flex-1 space-y-3">
+                  <div className="h-7 w-3/4 rounded bg-muted/60" />
+                  <div className="h-5 w-32 rounded bg-muted/60" />
+                  <div className="flex gap-2">
+                    <div className="h-6 w-16 rounded-full bg-muted/60" />
+                    <div className="h-6 w-20 rounded-full bg-muted/60" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="h-48 rounded-2xl bg-muted/40" />
+              <div className="h-64 rounded-2xl bg-muted/40" />
+            </div>
+            <div className="space-y-5">
+              <div className="h-40 rounded-2xl bg-muted/40" />
+              <div className="h-56 rounded-2xl bg-muted/40" />
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
   if (isError || !ticket) return <AppLayout><div className="text-center p-8 text-destructive">Ticket not found.</div></AppLayout>;
 
   const isClosing = pendingStatus === 'closed';
+  const ticketNum = (ticket as any).ticketNumber ?? `#${ticket.id.substring(0, 8)}`;
+  const statusForBadge =
+    ticket.status === "open" && (ticket.priority === "high" || ticket.priority === "critical")
+      ? "open_urgent"
+      : ticket.status;
 
   return (
     <AppLayout>
-      <div className="space-y-6 max-w-5xl mx-auto">
-        <Link href="/tickets" className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Tickets
+      <div className="space-y-6 max-w-6xl mx-auto">
+        <Link
+          href="/tickets"
+          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 -ml-2 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to tickets
         </Link>
 
         {/* Priority Confirmation Dialog */}
@@ -353,130 +403,209 @@ export default function TicketDetail() {
           </DialogContent>
         </Dialog>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Hero */}
+        <section className="relative overflow-hidden rounded-2xl border border-primary/20 shadow-[0_8px_32px_rgba(53,88,114,0.12)]">
+          <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", priorityStripe(ticket.priority))} />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.06] via-card to-accent/[0.04]" />
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-[0.35]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 1px 1px, rgba(53,88,114,0.06) 1px, transparent 0)",
+              backgroundSize: "18px 18px",
+            }}
+          />
 
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
-              <CardHeader className="bg-muted/20 border-b border-border/50 pb-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-mono text-muted-foreground">{(ticket as any).ticketNumber ?? `#${ticket.id.substring(0, 8)}`}</p>
-                      <button
-                        onClick={handleCopyTicketNumber}
-                        className="text-muted-foreground hover:text-foreground transition-colors"
-                        title="Copy ticket number"
-                      >
-                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    <CardTitle className="text-2xl font-display leading-tight">{ticket.title}</CardTitle>
-                  </div>
-                  <div className="flex flex-col gap-2 items-end">
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" className="h-8 px-2 rounded-lg text-muted-foreground hover:text-foreground" onClick={handlePrint} title="Print ticket">
-                        <Printer className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <StatusBadge status={ticket.priority} />
-                    <StatusBadge status={ticket.status} />
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                  <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> Opened {format(new Date(ticket.createdAt), 'MMM d, yyyy h:mm a')}</span>
-                  {(ticket as any).resolvedAt && (
-                    <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400"><Clock className="w-4 h-4" /> Resolved {format(new Date((ticket as any).resolvedAt), 'MMM d, yyyy h:mm a')}</span>
-                  )}
-                  {(ticket as any).closedAt && (
-                    <span className="flex items-center gap-1.5 text-muted-foreground"><Clock className="w-4 h-4" /> Closed {format(new Date((ticket as any).closedAt), 'MMM d, yyyy h:mm a')}</span>
-                  )}
-                  <span className="flex items-center gap-1.5 px-2 py-1 bg-background rounded-md border border-border/50">
-                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px]">{ticket.createdBy.fullName.charAt(0)}</span>
-                    {ticket.createdBy.fullName}
+          <div className="relative flex flex-col gap-5 p-6 md:flex-row md:items-start md:justify-between md:p-8 pl-8">
+            <div className="flex items-start gap-4 min-w-0">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15 shadow-sm">
+                <TicketIcon className="w-7 h-7" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl md:text-2xl font-display font-bold text-foreground leading-snug">
+                  {ticket.title}
+                </h1>
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <span className="font-mono text-sm text-primary font-semibold bg-primary/[0.06] border border-primary/10 px-2 py-0.5 rounded-md">
+                    {ticketNum}
                   </span>
-                  {(ticket as any).type && (
-                    <span className="px-2 py-1 bg-muted rounded-md border border-border/50 text-xs font-medium">
+                  <button
+                    type="button"
+                    onClick={handleCopyTicketNumber}
+                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                    title="Copy ticket number"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-xs text-emerald-600">Copied</span>
+                      </>
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 mt-3">
+                  <StatusBadge status={statusForBadge} />
+                  <StatusBadge status={ticket.priority} />
+                  {(ticket as any).type && (ticket as any).type !== "other" && (
+                    <span className="text-xs text-muted-foreground bg-muted/80 px-2.5 py-1 rounded-md border border-border/50 font-medium">
                       {TICKET_TYPE_LABEL[(ticket as any).type] ?? (ticket as any).type}
                     </span>
                   )}
                 </div>
-              </CardHeader>
-              <CardContent className="p-8">
-                <div className="prose dark:prose-invert max-w-none">
-                  <p className="whitespace-pre-wrap leading-relaxed">{ticket.description}</p>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-primary/60" />
+                    Opened {format(new Date(ticket.createdAt), "MMM d, yyyy h:mm a")}
+                  </span>
+                  {(ticket as any).resolvedAt && (
+                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                      Resolved {format(new Date((ticket as any).resolvedAt), "MMM d, yyyy h:mm a")}
+                    </span>
+                  )}
+                  {(ticket as any).closedAt && (
+                    <span className="flex items-center gap-1.5">
+                      Closed {format(new Date((ticket as any).closedAt), "MMM d, yyyy h:mm a")}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px] ring-1 ring-primary/10">
+                      {ticket.createdBy.fullName.charAt(0)}
+                    </span>
+                    <span>
+                      by <span className="font-medium text-foreground">{ticket.createdBy.fullName}</span>
+                    </span>
+                  </span>
                 </div>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" className="h-9 rounded-xl shrink-0 bg-card/80 backdrop-blur-sm" onClick={handlePrint} title="Print ticket">
+              <Printer className="w-4 h-4 mr-1.5" /> Print
+            </Button>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="border-border/60 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="border-b border-border/50 bg-muted/20 py-4 px-6">
+                <CardTitle className="text-base font-display flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-primary" />
+                  Description
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 md:p-8">
+                <p className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-[15px]">{ticket.description}</p>
               </CardContent>
             </Card>
 
             {/* Activity Log */}
             <div className="space-y-4">
-              <h3 className="text-lg font-bold font-display flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-primary" /> Activity Log
+              <h3 className="text-base font-display font-semibold flex items-center gap-2 text-foreground">
+                <History className="w-5 h-5 text-primary" />
+                Activity log
+                <span className="text-xs font-normal text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">
+                  {ticket.comments.length} {ticket.comments.length === 1 ? "entry" : "entries"}
+                </span>
               </h3>
-              <div className="space-y-2">
-                {ticket.comments.map((comment) => {
-                  // System entries start with an emoji action indicator
-                  const isSystemEntry = /^[🔄👤🔓⬆️⬇️✅📝]/.test(comment.commentText);
-                  if (isSystemEntry) {
-                    return (
-                      <div key={comment.id} className="flex items-start gap-3 px-3 py-2">
-                        <div className="w-px self-stretch bg-border/50 mx-2 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{comment.commentText}</p>
-                          <p className="text-[10px] text-muted-foreground/50 mt-0.5">{format(new Date(comment.createdAt), 'MMM d, h:mm a')}</p>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <Card key={comment.id} className="border-border/50 shadow-sm rounded-xl">
-                      <CardHeader className="py-3 px-4 bg-muted/20 border-b border-border/50 flex flex-row items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-xs">
-                            {comment.createdBy.fullName.charAt(0)}
+              <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+                {ticket.comments.length === 0 ? (
+                  <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+                    No activity yet. Updates and replies will appear here.
+                  </div>
+                ) : (
+                  <div className="relative px-4 py-3">
+                    <div
+                      aria-hidden
+                      className="absolute left-[27px] top-6 bottom-6 w-px bg-border/70"
+                    />
+                    <div className="space-y-1">
+                      {ticket.comments.map((comment) => {
+                        const isSystemEntry = /^[🔄👤🔓⬆️⬇️✅📝]/.test(comment.commentText);
+                        if (isSystemEntry) {
+                          return (
+                            <div key={comment.id} className="relative flex gap-3 py-3 pl-1">
+                              <div className="relative z-10 mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted ring-2 ring-card">
+                                <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+                              </div>
+                              <div className="flex-1 min-w-0 rounded-lg bg-muted/40 px-3 py-2.5">
+                                <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                                  {comment.commentText}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground/60 mt-1.5">
+                                  {format(new Date(comment.createdAt), "MMM d, yyyy h:mm a")}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={comment.id} className="relative flex gap-3 py-3 pl-1">
+                            <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent font-bold text-xs ring-2 ring-card">
+                              {comment.createdBy.fullName.charAt(0)}
+                            </div>
+                            <div className="flex-1 min-w-0 rounded-xl border border-border/50 bg-background px-4 py-3 shadow-sm">
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <span className="font-semibold text-sm text-foreground">
+                                  {comment.createdBy.fullName}
+                                </span>
+                                <span className="text-xs text-muted-foreground shrink-0">
+                                  {format(new Date(comment.createdAt), "MMM d, h:mm a")}
+                                </span>
+                              </div>
+                              <p className="text-sm whitespace-pre-wrap text-foreground/90 leading-relaxed">
+                                {comment.commentText}
+                              </p>
+                            </div>
                           </div>
-                          <span className="font-semibold text-sm">{comment.createdBy.fullName}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">{format(new Date(comment.createdAt), 'MMM d, h:mm a')}</span>
-                      </CardHeader>
-                      <CardContent className="p-4 text-sm whitespace-pre-wrap">{comment.commentText}</CardContent>
-                    </Card>
-                  );
-                })}
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {ticket.status !== 'closed' && (
-                <Card className="border-primary/20 shadow-md shadow-primary/5 rounded-xl border-2">
-                  <CardContent className="p-4">
-                    <Textarea
-                      placeholder="Type your reply here..."
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value.slice(0, MAX_COMMENT))}
-                      className="min-h-[100px] mb-2 border-border/50 focus-visible:ring-primary/20 rounded-lg resize-none"
-                    />
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-xs ${commentText.length >= MAX_COMMENT ? 'text-destructive' : 'text-muted-foreground'}`}>
-                        {commentText.length}/{MAX_COMMENT}
-                      </span>
-                      <Button
-                        onClick={handleAddComment}
-                        disabled={!commentText.trim() || commentMutation.isPending}
-                        className="rounded-lg shadow-md shadow-primary/20"
-                      >
-                        {commentMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-                        Send Reply
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+              {ticket.status !== "closed" && (
+                <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-card to-primary/[0.02] shadow-sm p-5">
+                  <p className="text-sm font-medium text-foreground mb-3">Add a reply</p>
+                  <Textarea
+                    placeholder="Type your reply here..."
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value.slice(0, MAX_COMMENT))}
+                    className="min-h-[100px] mb-3 border-border/50 focus-visible:ring-primary/20 rounded-xl resize-none bg-background"
+                  />
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-xs ${commentText.length >= MAX_COMMENT ? "text-destructive" : "text-muted-foreground"}`}
+                    >
+                      {commentText.length}/{MAX_COMMENT}
+                    </span>
+                    <Button
+                      onClick={handleAddComment}
+                      disabled={!commentText.trim() || commentMutation.isPending}
+                      className="rounded-xl shadow-md shadow-primary/20"
+                    >
+                      {commentMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-2" />
+                      )}
+                      Send reply
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* SLA Card */}
+            <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
             <SLABadge
               variant="full"
               priority={ticket.priority}
@@ -487,31 +616,39 @@ export default function TicketDetail() {
               totalHoldSeconds={(ticket as any).totalHoldSeconds}
               onHoldAt={(ticket as any).onHoldAt}
             />
+            </div>
 
             {/* Assigned staff — visible to general users */}
             {!canManage && (
-              <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl">
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    <UserCheck className="w-4 h-4" />
+              <Card className="border-border/60 shadow-sm rounded-2xl overflow-hidden">
+                <CardHeader className="border-b border-border/50 bg-muted/20 py-3.5 px-5">
+                  <CardTitle className="text-sm font-display flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-primary" />
+                    Assigned to
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-5 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 font-bold text-sm ring-1 ring-primary/10">
+                    {ticket.assignedTo ? ticket.assignedTo.fullName.charAt(0) : "—"}
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Assigned To</p>
                     {ticket.assignedTo ? (
                       <p className="text-sm font-semibold text-foreground">{ticket.assignedTo.fullName}</p>
                     ) : (
-                      <p className="text-sm text-muted-foreground italic">Unassigned</p>
+                      <p className="text-sm text-muted-foreground italic">Awaiting assignment</p>
                     )}
+                    <p className="text-xs text-muted-foreground mt-0.5">Support staff member</p>
                   </div>
                 </CardContent>
               </Card>
             )}
 
             {(canManage || (ticket.status === 'resolved' && ticket.createdBy.id === user?.id)) && (
-              <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl">
-                <CardHeader className="border-b border-border/50 py-4 px-6">
+              <Card className="border-border/60 shadow-sm rounded-2xl overflow-hidden">
+                <CardHeader className="border-b border-border/50 bg-muted/20 py-4 px-6">
                   <CardTitle className="text-base font-display flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-primary" /> Management
+                    <ShieldAlert className="w-5 h-5 text-primary" />
+                    Ticket management
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-5">
@@ -654,16 +791,34 @@ export default function TicketDetail() {
             )}
 
             {ticket.asset && (
-              <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl overflow-hidden group">
-                <div className="bg-primary/5 p-4 border-b border-border/50 flex justify-center">
-                  <MonitorSmartphone className="w-12 h-12 text-primary opacity-80 group-hover:scale-110 transition-transform duration-300" />
+              <Card className="border-border/60 shadow-sm rounded-2xl overflow-hidden group">
+                <div className="bg-gradient-to-br from-primary/8 via-primary/5 to-accent/5 p-5 border-b border-border/50 flex justify-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15 group-hover:scale-105 transition-transform duration-300">
+                    <MonitorSmartphone className="w-8 h-8" />
+                  </div>
                 </div>
-                <CardContent className="p-6 space-y-3">
-                  <h4 className="font-bold font-display text-lg leading-tight">{ticket.asset.name}</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-muted-foreground">Tag:</span><span className="font-mono bg-muted px-1.5 py-0.5 rounded">{ticket.asset.assetTag}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Category:</span><span className="capitalize">{ticket.asset.category}</span></div>
-                    <div className="flex justify-between items-center"><span className="text-muted-foreground">Asset Status:</span><StatusBadge status={ticket.asset.status} /></div>
+                <CardContent className="p-6 space-y-4">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                      Related asset
+                    </p>
+                    <h4 className="font-bold font-display text-lg leading-tight">{ticket.asset.name}</h4>
+                  </div>
+                  <div className="space-y-2.5 text-sm rounded-xl bg-muted/40 p-3.5">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Tag</span>
+                      <span className="font-mono font-medium bg-background px-1.5 py-0.5 rounded border border-border/50">
+                        {ticket.asset.assetTag}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Category</span>
+                      <span className="capitalize font-medium">{ticket.asset.category}</span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-muted-foreground">Status</span>
+                      <StatusBadge status={ticket.asset.status} />
+                    </div>
                   </div>
                 </CardContent>
                 {canManage && (
@@ -685,7 +840,7 @@ export default function TicketDetail() {
               if (alreadyRated) {
                 const rating = (ticket as any).satisfactionRating as number;
                 return (
-                  <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl">
+                  <Card className="border-border/60 shadow-sm rounded-2xl">
                     <CardHeader className="border-b border-border/50 py-4 px-6">
                       <CardTitle className="text-base font-display flex items-center gap-2">
                         <Star className="w-5 h-5 text-amber-400 fill-amber-400" /> Your Rating

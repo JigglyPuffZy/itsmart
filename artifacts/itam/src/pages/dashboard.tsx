@@ -1,362 +1,349 @@
 import { useState } from "react";
-import { useGetDashboardStats, useGetStaffWorkload, useGetTicketTrend, useGetAssetAnomalies } from "@/lib/supabase-queries";
+import {
+  useGetDashboardStats,
+  useGetStaffWorkload,
+  useGetTicketTrend,
+  useGetAssetAnomalies,
+  type Ticket,
+} from "@/lib/supabase-queries";
 import { useAuth } from "@/lib/auth-context";
 import { AppLayout } from "@/components/layout/app-layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Monitor, TicketIcon, CheckCircle2, AlertCircle, Loader2, ArrowRight, PackageX, Clock, Users, AlertTriangle, Wrench, Archive, Zap } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  TicketIcon,
+  Users,
+  AlertTriangle,
+  Wrench,
+  Archive,
+  Zap,
+  TrendingUp,
+  ChevronRight,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { format } from "date-fns";
 import { Link } from "wouter";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
+import { WelcomeBanner } from "@/components/dashboard/welcome-banner";
+import { MetricGrid, buildDashboardMetrics, motionItem } from "@/components/dashboard/metric-cards";
+import { AssetStatusPanel } from "@/components/dashboard/asset-status-panel";
+import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
+import { DashboardPanel } from "@/components/dashboard/dashboard-panel";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { cn } from "@/lib/utils";
+
+const ticketTrendConfig = {
+  opened: { label: "Opened", color: "hsl(var(--primary))" },
+  resolved: { label: "Resolved", color: "hsl(var(--accent))" },
+};
+
+const container = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.04 } },
+};
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function priorityAccent(priority: string) {
+  if (priority === "critical") return "bg-red-500";
+  if (priority === "high") return "bg-amber-500";
+  if (priority === "medium") return "bg-sky-500";
+  return "bg-slate-300";
+}
+
+function workloadLabel(count: number) {
+  if (count >= 5) return { text: "High load", className: "text-red-600 bg-red-50 border-red-100" };
+  if (count >= 3) return { text: "Moderate", className: "text-amber-700 bg-amber-50 border-amber-100" };
+  if (count > 0) return { text: "Normal", className: "text-emerald-700 bg-emerald-50 border-emerald-100" };
+  return { text: "Available", className: "text-muted-foreground bg-muted/50 border-border" };
+}
 
 export default function Dashboard() {
   const { data: stats, isLoading, isError } = useGetDashboardStats();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'administrator';
+  const isAdmin = user?.role === "administrator";
+  const isGeneral = user?.role === "general_user";
   const { data: staffWorkload = [] } = useGetStaffWorkload();
   const [trendWeeks, setTrendWeeks] = useState(8);
   const { data: ticketTrend = [] } = useGetTicketTrend(trendWeeks);
   const { data: assetAnomalies = [] } = useGetAssetAnomalies();
 
-  if (isLoading) {
-    return (
-      <AppLayout>
-        <div className="flex h-[60vh] items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      </AppLayout>
-    );
-  }
+  if (isLoading || !user) return <DashboardSkeleton />;
 
   if (isError || !stats) {
     return (
       <AppLayout>
-        <div className="text-center text-destructive p-8 bg-destructive/10 rounded-2xl border border-destructive/20">
-          Failed to load dashboard statistics.
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-8 text-center text-destructive">
+          Failed to load dashboard. Please refresh the page.
         </div>
       </AppLayout>
     );
   }
 
-  const isSupport = user?.role === 'support_staff';
-  const isGeneral = user?.role === 'general_user';
+  const statsRecord = stats as Record<string, number>;
+  const metrics = buildDashboardMetrics(statsRecord, user.role, user.id);
 
-  // KPI cards — role-specific
-  const statCards = isAdmin ? [
-    { title: "Total Assets",             value: stats.totalAssets,                      icon: Monitor,      color: "text-indigo-500",  bg: "bg-indigo-500/10",  href: "/assets?scope=all" },
-    { title: "Active Assets",            value: (stats as any).availableAssets ?? 0,    icon: CheckCircle2, color: "text-blue-500",    bg: "bg-blue-500/10",    href: "/assets?status=active&scope=all" },
-    { title: "Inactive Assets",          value: (stats as any).inactiveAssets ?? 0,     icon: PackageX,     color: "text-slate-500",   bg: "bg-slate-500/10",   href: "/assets?status=inactive&scope=all" },
-    { title: "Assets Assigned to Me",    value: (stats as any).myAssignedAssets ?? 0,   icon: Monitor,      color: "text-violet-500",  bg: "bg-violet-500/10",  href: "/assets?scope=mine" },
-    { title: "All Tickets",              value: (stats as any).allTickets ?? 0,          icon: TicketIcon,   color: "text-indigo-500",  bg: "bg-indigo-500/10",  href: "/tickets?scope=all" },
-    { title: "Open Tickets",             value: stats.openTickets,                      icon: AlertCircle,  color: "text-amber-500",   bg: "bg-amber-500/10",   href: "/tickets?status=open&scope=all" },
-    { title: "In Progress Tickets",      value: (stats as any).inProgressTickets ?? 0,  icon: Clock,        color: "text-sky-500",     bg: "bg-sky-500/10",     href: "/tickets?status=in_progress&scope=all" },
-    { title: "Resolved & Closed",        value: stats.resolvedTickets,                  icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", href: "/tickets?status=resolved_closed&scope=all" },
-    { title: "Tickets Assigned to Me",   value: (stats as any).myTickets ?? 0,          icon: Clock,        color: "text-violet-500",  bg: "bg-violet-500/10",  href: `/tickets?assignedTo=${user?.id}` },
-  ] : isSupport ? [
-    { title: "Total Assets",          value: stats.totalAssets,                      icon: Monitor,      color: "text-indigo-500",  bg: "bg-indigo-500/10",  href: "/assets?scope=all" },
-    { title: "Active Assets",         value: (stats as any).availableAssets ?? 0,    icon: CheckCircle2, color: "text-blue-500",    bg: "bg-blue-500/10",    href: "/assets?status=active&scope=all" },
-    { title: "Inactive Assets",       value: (stats as any).inactiveAssets ?? 0,     icon: PackageX,     color: "text-slate-500",   bg: "bg-slate-500/10",   href: "/assets?status=inactive&scope=all" },
-    { title: "Assets Assigned to Me", value: (stats as any).myAssignedAssets ?? 0,   icon: Monitor,      color: "text-violet-500",  bg: "bg-violet-500/10",  href: "/assets?scope=mine" },
-    { title: "Open Tickets",          value: stats.openTickets,                      icon: AlertCircle,  color: "text-amber-500",   bg: "bg-amber-500/10",   href: "/tickets?status=open&scope=all" },
-    { title: "All Assigned Tickets",  value: (stats as any).totalTickets ?? 0,       icon: TicketIcon,   color: "text-sky-500",     bg: "bg-sky-500/10",     href: "/tickets?scope=mine" },
-    { title: "Resolved & Closed",     value: stats.resolvedTickets,                  icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", href: "/tickets?status=resolved_closed&scope=mine" },
-  ] : /* general_user */ [
-    { title: "Assets Assigned to Me", value: (stats as any).myAssignedAssets ?? 0,   icon: Monitor,      color: "text-indigo-500",  bg: "bg-indigo-500/10",  href: "/assets?scope=mine" },
-    { title: "My Open Tickets",       value: stats.openTickets,                      icon: AlertCircle,  color: "text-amber-500",   bg: "bg-amber-500/10",   href: "/tickets?status=open&scope=mine" },
-    { title: "My Tickets",            value: (stats as any).totalTickets ?? 0,       icon: TicketIcon,   color: "text-sky-500",     bg: "bg-sky-500/10",     href: "/tickets?scope=mine" },
-    { title: "Resolved & Closed",     value: stats.resolvedTickets,                  icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", href: "/tickets?status=resolved_closed&scope=mine" },
-  ];
-
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
-  };
-
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
-  };
+  const ticketsTitle = isGeneral ? "My recent tickets" : "Recent tickets";
+  const hasTrendData = !ticketTrend.every((p) => p.opened === 0 && p.resolved === 0);
+  const showAdminGrid = isAdmin && (staffWorkload.length > 0 || assetAnomalies.length > 0);
 
   return (
     <AppLayout>
-      <motion.div variants={container} initial="hidden" animate="show" className="space-y-8">
-        
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {statCards.map((stat, i) => (
-            <motion.div key={i} variants={item}>
-              <Link href={stat.href}>
-                <Card className="border-0 shadow-lg shadow-black/5 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 rounded-2xl overflow-hidden group cursor-pointer">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-                        <p className="text-3xl font-display font-bold text-foreground">{stat.value}</p>
-                      </div>
-                      <div className={`w-12 h-12 rounded-2xl ${stat.bg} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                        <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            </motion.div>
-          ))}
-        </div>
+      <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 md:space-y-8">
+        <motion.div variants={motionItem}>
+          <WelcomeBanner user={user} />
+        </motion.div>
 
-        <div className={`grid grid-cols-1 ${!isGeneral ? 'lg:grid-cols-3' : ''} gap-8`}>
-          
-          {/* Recent Tickets */}
-          <motion.div variants={item} className={!isGeneral ? 'lg:col-span-2' : ''}>
-            <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl h-full flex flex-col">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-border/50 px-6 py-5">
-                <CardTitle className="text-lg font-display">
-                  {isGeneral ? 'My Recent Tickets' : isSupport ? 'Recently Assigned Tickets' : 'Recent Tickets'}
-                </CardTitle>
-                <Link href="/tickets" className="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1 group">
-                  View all <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </CardHeader>
-              <CardContent className="p-0 flex-1 flex flex-col">
-                {stats.recentTickets.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center p-10 text-center gap-3">
-                    <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
-                      <TicketIcon className="w-7 h-7 text-muted-foreground/40" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground">No tickets yet</p>
-                      <p className="text-sm text-muted-foreground mt-0.5">Support tickets will appear here once created.</p>
-                    </div>
+        <motion.div variants={motionItem}>
+          <MetricGrid metrics={metrics} />
+        </motion.div>
+
+        <div className={cn("grid gap-5", !isGeneral && "lg:grid-cols-5")}>
+          <motion.div variants={motionItem} className={!isGeneral ? "lg:col-span-3" : ""}>
+            <DashboardPanel
+              title={ticketsTitle}
+              description="Latest activity in your scope"
+              icon={<TicketIcon className="h-4 w-4" />}
+              action={{ label: "All tickets", href: "/tickets" }}
+              className="h-full"
+            >
+              {stats.recentTickets.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/[0.06] ring-1 ring-primary/10 mb-4">
+                    <TicketIcon className="h-7 w-7 text-primary/40" />
                   </div>
-                ) : (
-                  <div className="divide-y divide-border/50">
-                    {stats.recentTickets.map((ticket) => (
-                      <Link key={ticket.id} href={`/tickets/${ticket.id}`} className="flex items-center justify-between p-4 px-6 hover:bg-muted/50 transition-colors">
-                        <div className="space-y-1 truncate pr-4">
-                          <p className="font-semibold text-foreground truncate">{ticket.title}</p>
-                          <p className="text-xs text-muted-foreground flex gap-2 items-center">
-                            <span>{ticket.createdBy.fullName}</span>
-                            <span>•</span>
-                            <span>{format(new Date(ticket.createdAt), 'MMM d, yyyy')}</span>
+                  <p className="text-sm font-display font-semibold text-foreground">No tickets yet</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 max-w-xs leading-relaxed">
+                    New support requests will show up here for quick access.
+                  </p>
+                  <Link
+                    href="/tickets"
+                    className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                  >
+                    Go to tickets
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              ) : (
+                <div className="p-2">
+                  {stats.recentTickets.map((ticket: Ticket) => (
+                    <Link
+                      key={ticket.id}
+                      href={`/tickets/${ticket.id}`}
+                      className="group flex items-stretch rounded-xl transition-colors hover:bg-primary/[0.04]"
+                    >
+                      <div className={cn("w-1 shrink-0 rounded-full my-2 ml-1", priorityAccent(ticket.priority))} />
+                      <div className="flex flex-1 items-center gap-3 px-3 py-3 min-w-0">
+                        <Avatar className="h-9 w-9 shrink-0 hidden sm:flex ring-1 ring-border/50">
+                          <AvatarFallback className="bg-primary/[0.08] text-primary text-[10px] font-semibold">
+                            {getInitials(ticket.createdBy.fullName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                            {ticket.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {ticket.createdBy.fullName} · {format(new Date(ticket.createdAt), "MMM d, yyyy")}
                           </p>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <StatusBadge status={ticket.priority} className="hidden sm:inline-flex" />
-                          <StatusBadge status={ticket.status} />
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                        <StatusBadge status={ticket.status} />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/25 group-hover:text-primary shrink-0 hidden sm:block transition-colors" />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </DashboardPanel>
           </motion.div>
 
-          {/* Asset Status Breakdown — admin and support staff only */}
           {!isGeneral && (
-          <motion.div variants={item}>
-            <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl h-full">
-              <CardHeader className="border-b border-border/50 px-6 py-5">
-                <CardTitle className="text-lg font-display">Asset Status</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                {[
-                  { label: 'Active',      value: (stats as any).availableAssets ?? 0,    color: 'bg-blue-500',    text: 'text-blue-600' },
-                  { label: 'Inactive',    value: (stats as any).inactiveAssets ?? 0,     color: 'bg-slate-400',   text: 'text-slate-500' },
-                  { label: 'Maintenance', value: (stats as any).inMaintenanceAssets ?? 0, color: 'bg-amber-500',  text: 'text-amber-600' },
-                  { label: 'Retired',     value: (stats as any).retiredAssets ?? 0,      color: 'bg-red-400',     text: 'text-red-500' },
-                ].map(({ label, value, color, text }) => {
-                  const pct = stats.totalAssets > 0 ? Math.round((value / stats.totalAssets) * 100) : 0;
-                  return (
-                    <div key={label} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-foreground">{label}</span>
-                        <span className={`font-bold ${text}`}>{value} <span className="text-muted-foreground font-normal text-xs">({pct}%)</span></span>
-                      </div>
-                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                        <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-                <div className="pt-3 border-t border-border/50 flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total</span>
-                  <span className="font-bold text-foreground">{stats.totalAssets}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+            <motion.div variants={motionItem} className="lg:col-span-2">
+              <AssetStatusPanel
+                totalAssets={stats.totalAssets}
+                availableAssets={statsRecord.availableAssets ?? 0}
+                inactiveAssets={statsRecord.inactiveAssets ?? 0}
+                inMaintenanceAssets={statsRecord.inMaintenanceAssets ?? 0}
+                retiredAssets={statsRecord.retiredAssets ?? 0}
+              />
+            </motion.div>
           )}
         </div>
 
-        {/* Ticket Trend Chart */}
-        <motion.div variants={item}>
-          <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl">
-            <CardHeader className="border-b border-border/50 px-6 py-5">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-display flex items-center gap-2">
-                  <TicketIcon className="w-5 h-5 text-primary" /> Ticket Trends
-                </CardTitle>
-                <div className="flex items-center gap-3">
-                  {ticketTrend.length > 0 && (
-                    <span className="text-xs text-muted-foreground hidden sm:block">
-                      {ticketTrend[0]?.week} – {ticketTrend[ticketTrend.length - 1]?.week}
-                    </span>
-                  )}
-                  <Select value={String(trendWeeks)} onValueChange={v => setTrendWeeks(Number(v))}>
-                    <SelectTrigger className="h-8 w-[110px] rounded-lg text-xs border-border/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="4">4 weeks</SelectItem>
-                      <SelectItem value="8">8 weeks</SelectItem>
-                      <SelectItem value="12">3 months</SelectItem>
-                      <SelectItem value="24">6 months</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              {ticketTrend.every(p => p.opened === 0 && p.resolved === 0) ? (
-                <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-                  No ticket data available yet.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={ticketTrend} margin={{ top: 4, right: 8, left: -16, bottom: 0 }} barCategoryGap="30%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis dataKey="week" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', color: 'hsl(var(--foreground))' }}
-                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.5 }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '12px' }} />
-                    <Bar dataKey="opened" name="Opened" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="resolved" name="Resolved" fill="#10b981" radius={[4, 4, 0, 0]} />
+        {hasTrendData && (
+          <motion.div variants={motionItem}>
+            <DashboardPanel
+              title="Ticket trends"
+              description="Opened vs resolved over time"
+              icon={<TrendingUp className="h-4 w-4" />}
+              headerExtra={
+                <Select value={String(trendWeeks)} onValueChange={(v) => setTrendWeeks(Number(v))}>
+                  <SelectTrigger className="h-8 w-[118px] rounded-lg text-xs border-border/60 bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="4">4 weeks</SelectItem>
+                    <SelectItem value="8">8 weeks</SelectItem>
+                    <SelectItem value="12">3 months</SelectItem>
+                    <SelectItem value="24">6 months</SelectItem>
+                  </SelectContent>
+                </Select>
+              }
+            >
+              <div className="px-5 pb-5 pt-1">
+                <ChartContainer config={ticketTrendConfig} className="h-[252px] w-full aspect-auto">
+                  <BarChart
+                    data={ticketTrend}
+                    margin={{ top: 8, right: 8, left: -8, bottom: 0 }}
+                    barCategoryGap="26%"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/40" />
+                    <XAxis dataKey="week" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={10} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
+                    <ChartTooltip content={<ChartTooltipContent />} cursor={{ opacity: 0.25 }} />
+                    <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "14px" }} />
+                    <Bar dataKey="opened" fill="var(--color-opened)" radius={[5, 5, 0, 0]} maxBarSize={38} />
+                    <Bar dataKey="resolved" fill="var(--color-resolved)" radius={[5, 5, 0, 0]} maxBarSize={38} />
                   </BarChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+                </ChartContainer>
+              </div>
+            </DashboardPanel>
+          </motion.div>
+        )}
 
-        {/* Support Staff Workload — admin only */}
-        {isAdmin && staffWorkload.length > 0 && (
-          <motion.div variants={item}>
-            <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl">
-              <CardHeader className="border-b border-border/50 px-6 py-5 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg font-display flex items-center gap-2">
-                  <Users className="w-5 h-5 text-primary" /> Support Staff Workload
-                </CardTitle>
-                <Link href="/tickets" className="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1 group">
-                  View tickets <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-border/50">
-                  {staffWorkload.map((staff) => {
-                    const maxTotal = Math.max(...staffWorkload.map(s => s.totalActive), 1);
-                    const pct = Math.round((staff.totalActive / maxTotal) * 100);
-                    return (
-                      <div key={staff.id} className="flex items-center gap-4 px-6 py-4">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
-                          {staff.fullName.charAt(0)}
-                        </div>
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-sm text-foreground truncate">{staff.fullName}</span>
-                            <div className="flex items-center gap-2 shrink-0 text-xs">
-                              <span className="bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 px-2 py-0.5 rounded-md border border-sky-200 dark:border-sky-700">
-                                {staff.inProgressCount} in progress
-                              </span>
-                              {staff.onHoldCount > 0 && (
-                                <span className="bg-neutral-200 text-neutral-700 dark:bg-neutral-700/30 dark:text-neutral-300 px-2 py-0.5 rounded-md border border-neutral-300 dark:border-neutral-600">
-                                  {staff.onHoldCount} on hold
+        {showAdminGrid && (
+          <div className="grid gap-5 lg:grid-cols-2">
+            {staffWorkload.length > 0 && (
+              <motion.div variants={motionItem}>
+                <DashboardPanel
+                  title="Team workload"
+                  description="Active tickets per support staff"
+                  icon={<Users className="h-4 w-4" />}
+                  action={{ label: "Tickets", href: "/tickets" }}
+                >
+                  <div className="divide-y divide-border/50">
+                    {staffWorkload.map((staff) => {
+                      const max = Math.max(...staffWorkload.map((s) => s.totalActive), 1);
+                      const pct = Math.round((staff.totalActive / max) * 100);
+                      const load = workloadLabel(staff.totalActive);
+                      const barColor =
+                        staff.totalActive >= 5
+                          ? "bg-red-500"
+                          : staff.totalActive >= 3
+                            ? "bg-amber-500"
+                            : "bg-emerald-500";
+
+                      return (
+                        <div key={staff.id} className="flex items-center gap-3 px-4 py-3.5">
+                          <Avatar className="h-9 w-9 shrink-0 ring-1 ring-border/50">
+                            <AvatarFallback className="bg-primary/[0.08] text-primary text-xs font-bold">
+                              {staff.fullName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm font-medium truncate">{staff.fullName}</span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span
+                                  className={cn(
+                                    "text-[10px] font-semibold px-2 py-0.5 rounded-md border",
+                                    load.className
+                                  )}
+                                >
+                                  {load.text}
                                 </span>
-                              )}
+                                <span className="text-sm font-display font-bold tabular-nums w-5 text-right">
+                                  {staff.totalActive}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted/80 overflow-hidden">
+                              <div
+                                className={cn("h-full rounded-full transition-all duration-700", barColor)}
+                                style={{ width: `${pct}%` }}
+                              />
                             </div>
                           </div>
-                          <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${staff.totalActive === 0 ? 'bg-muted-foreground/20' : staff.totalActive >= 5 ? 'bg-red-400' : staff.totalActive >= 3 ? 'bg-amber-400' : 'bg-emerald-400'}`}
-                              style={{ width: `${pct}%` }}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </DashboardPanel>
+              </motion.div>
+            )}
+
+            {assetAnomalies.length > 0 && (
+              <motion.div variants={motionItem}>
+                <DashboardPanel
+                  title={`Asset alerts (${assetAnomalies.length})`}
+                  description="Items requiring review"
+                  icon={<AlertTriangle className="h-4 w-4 text-amber-600" />}
+                  action={{ label: "Assets", href: "/assets" }}
+                  accent="warning"
+                >
+                  <div className="divide-y divide-border/50 max-h-[300px] overflow-y-auto">
+                    {assetAnomalies.slice(0, 6).map((anomaly) => {
+                      const icons = {
+                        frequent_reassignment: Zap,
+                        long_maintenance: Wrench,
+                        inactive_long: Archive,
+                        end_of_life: AlertTriangle,
+                        pm_overdue: Wrench,
+                      };
+                      const Icon = icons[anomaly.type];
+                      const critical = anomaly.severity === "critical";
+
+                      return (
+                        <Link
+                          key={`${anomaly.assetId}-${anomaly.type}`}
+                          href={`/assets/${anomaly.assetId}`}
+                          className="flex items-start gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors group"
+                        >
+                          <div
+                            className={cn(
+                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg mt-0.5",
+                              critical ? "bg-red-500/10" : "bg-amber-500/10"
+                            )}
+                          >
+                            <Icon
+                              className={cn(
+                                "h-4 w-4",
+                                critical ? "text-red-500" : "text-amber-600"
+                              )}
                             />
                           </div>
-                        </div>
-                        <span className="text-sm font-bold text-foreground shrink-0 w-6 text-right">{staff.totalActive}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Asset Anomaly Alerts — admin only */}
-        {isAdmin && assetAnomalies.length > 0 && (
-          <motion.div variants={item}>
-            <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl">
-              <CardHeader className="border-b border-border/50 px-6 py-5 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg font-display flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-amber-500" /> Asset Alerts
-                  <span className="ml-1 text-xs font-normal bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-700">
-                    {assetAnomalies.length}
-                  </span>
-                </CardTitle>
-                <Link href="/assets" className="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1 group">
-                  View assets <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-border/50">
-                  {assetAnomalies.slice(0, 8).map((anomaly) => {
-                    const iconMap = {
-                      frequent_reassignment: Zap,
-                      long_maintenance: Wrench,
-                      inactive_long: Archive,
-                      end_of_life: AlertTriangle,
-                      pm_overdue: Wrench,
-                    };
-                    const Icon = iconMap[anomaly.type];
-                    const isCritical = anomaly.severity === 'critical';
-                    return (
-                      <Link key={`${anomaly.assetId}-${anomaly.type}`} href={`/assets/${anomaly.assetId}`}
-                        className="flex items-start gap-4 px-6 py-4 hover:bg-muted/50 transition-colors">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${isCritical ? 'bg-red-100 dark:bg-red-900/20' : 'bg-amber-100 dark:bg-amber-900/20'}`}>
-                          <Icon className={`w-4 h-4 ${isCritical ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm text-foreground">{anomaly.assetName}</span>
-                            <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{anomaly.assetTag}</span>
-                            {isCritical && <span className="text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded border border-red-200 dark:border-red-800">Critical</span>}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                              {anomaly.assetName}
+                              {critical && (
+                                <span className="ml-2 text-[10px] font-bold uppercase text-red-500">
+                                  Critical
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+                              {anomaly.message}
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">{anomaly.message}</p>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                  {assetAnomalies.length > 8 && (
-                    <div className="px-6 py-3 text-xs text-muted-foreground text-center">
-                      +{assetAnomalies.length - 8} more — <Link href="/assets" className="text-primary hover:underline">view all assets</Link>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground/25 group-hover:text-primary shrink-0 mt-1" />
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </DashboardPanel>
+              </motion.div>
+            )}
+          </div>
         )}
-
       </motion.div>
     </AppLayout>
   );
 }
-

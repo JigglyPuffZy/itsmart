@@ -1,21 +1,22 @@
 import { ReactNode } from "react";
-import { Sidebar } from "./sidebar";
-import { Header } from "./header";
+import { FloatingNav } from "./floating-nav";
+import { AmbientBackground } from "./ambient-background";
 import { useAuth } from "@/lib/auth-context";
-import { SidebarProvider, useSidebar } from "@/lib/sidebar-context";
 import { Redirect } from "wouter";
 import { Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { BackToTop } from "@/components/ui/back-to-top";
 
-function AppLayoutInner({ children }: { children: ReactNode }) {
+export function AppLayout({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
-  const { collapsed } = useSidebar();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center">
+        <AmbientBackground />
+        <div className="flex flex-col items-center gap-4">
+          <div className="gooey-loader" />
+          <p className="text-sm text-muted-foreground font-medium">Loading ITSMART...</p>
+        </div>
       </div>
     );
   }
@@ -25,25 +26,13 @@ function AppLayoutInner({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <Sidebar />
-      <div className={cn("flex-1 flex flex-col transition-all duration-300", collapsed ? "ml-16" : "ml-64")}>
-        <Header />
-        <main className="flex-1 p-6 overflow-auto">
-          <div className="w-full">
-            {children}
-          </div>
-        </main>
-        <BackToTop />
-      </div>
+    <div className="min-h-screen">
+      <AmbientBackground />
+      <FloatingNav />
+      <main className="mx-auto max-w-[1400px] px-4 pb-28 pt-[5.5rem] md:px-6 md:pb-8 lg:pt-24">
+        {children}
+      </main>
+      <BackToTop />
     </div>
-  );
-}
-
-export function AppLayout({ children }: { children: ReactNode }) {
-  return (
-    <SidebarProvider>
-      <AppLayoutInner>{children}</AppLayoutInner>
-    </SidebarProvider>
   );
 }

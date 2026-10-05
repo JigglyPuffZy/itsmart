@@ -1,29 +1,36 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useGetUsers, useUpdateUser, useToggleUserActive, UserRole } from "@/lib/supabase-queries";
 import { useAuth } from "@/lib/auth-context";
 import { AppLayout } from "@/components/layout/app-layout";
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Search, Loader2, UserCog, UserCheck, UserX, KeyRound, UserPlus } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
+import { Loader2, UserPlus, Users, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Redirect } from "wouter";
 import { supabase } from "@/lib/supabase";
-import { SkeletonTable } from "@/components/ui/skeleton-table";
+import { PaginationBar } from "@/components/ui/pagination-bar";
+import type { UserCardData } from "@/components/users/user-card";
+import { UserTeamPanel } from "@/components/users/user-team-panel";
+import { UserToolbar } from "@/components/users/user-toolbar";
+import { applyUserFilter, type UserRoleFilter } from "@/components/users/user-summary-strip";
+
+const PAGE_SIZE = 24;
+
+function roleLabel(role: string) {
+  return role.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+}
 
 export default function UsersManagement() {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<UserRoleFilter>("all");
+  const [page, setPage] = useState(1);
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [newUser, setNewUser] = useState({ email: "", fullName: "", department: "", role: "general_user" });
@@ -33,16 +40,28 @@ export default function UsersManagement() {
   const updateMutation = useUpdateUser();
   const toggleActiveMutation = useToggleUserActive();
 
-  // Role guard — after all hooks to satisfy Rules of Hooks
-  if (user?.role !== 'administrator') return <Redirect to="/dashboard" />;
+  const allUsers = users ?? [];
+
+  const filteredUsers = useMemo(
+    () => applyUserFilter(allUsers, roleFilter),
+    [allUsers, roleFilter]
+  );
+
+  const pagedUsers = filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, roleFilter]);
+
+  if (user?.role !== "administrator") return <Redirect to="/dashboard" />;
 
   const handleRoleChange = async (id: string, newRole: UserRole) => {
     try {
       await updateMutation.mutateAsync({ id, data: { role: newRole } });
       toast({ title: "Role updated", description: "User permissions changed." });
       if (id === user?.id) await refreshUser();
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    } catch (e) {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    } catch {
       toast({ variant: "destructive", title: "Error", description: "Failed to update role." });
     }
   };
@@ -50,13 +69,15 @@ export default function UsersManagement() {
   const handleToggleActive = async (id: string, currentlyActive: boolean) => {
     try {
       await toggleActiveMutation.mutateAsync({ id, isActive: !currentlyActive });
-      toast({ title: currentlyActive ? "User deactivated" : "User activated", description: currentlyActive ? "User can no longer log in." : "User can now log in." });
-    } catch (e) {
+      toast({
+        title: currentlyActive ? "User deactivated" : "User activated",
+        description: currentlyActive ? "User can no longer log in." : "User can now log in.",
+      });
+    } catch {
       toast({ variant: "destructive", title: "Error", description: "Failed to update user status." });
     }
   };
 
-  // ── Add User ──────────────────────────────────────────────────────────────
   const handleAddUser = async () => {
     if (!newUser.email || !newUser.fullName) {
       toast({ variant: "destructive", title: "Missing fields", description: "Email and full name are required." });
@@ -65,26 +86,27 @@ export default function UsersManagement() {
     setAddingUser(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token}`,
-            "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify(newUser),
-        }
-      );
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify(newUser),
+      });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to create user");
-      toast({ title: "User created", description: `${newUser.fullName} has been added. Default password is "dostro2".` });
+      toast({
+        title: "User created",
+        description: `${newUser.fullName} has been added. Default password is "dostro2".`,
+      });
       setAddUserOpen(false);
       setNewUser({ email: "", fullName: "", department: "", role: "general_user" });
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Error", description: e.message || "Failed to create user." });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to create user.";
+      toast({ variant: "destructive", title: "Error", description: message });
     } finally {
       setAddingUser(false);
     }
@@ -94,211 +116,209 @@ export default function UsersManagement() {
     setResettingId(id);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token}`,
-            "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({ userId: id }),
-        }
-      );
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ userId: id }),
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(err.error || "Failed to reset password");
       }
-      // Mark user as needing to change password on next login
       await supabase.from("profiles").update({ must_change_password: true }).eq("id", id);
-      toast({ title: "Password reset", description: 'Password reset to "dostro2". User will be prompted to change it on next login.' });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Error", description: e.message || "Failed to reset password." });
+      toast({
+        title: "Password reset",
+        description: 'Password reset to "dostro2". User will be prompted to change it on next login.',
+      });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to reset password.";
+      toast({ variant: "destructive", title: "Error", description: message });
     } finally {
       setResettingId(null);
     }
   };
 
+  const hasSearch = !!search;
+  const hasActiveFilters = hasSearch || roleFilter !== "all";
+
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-5">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="app-page-eyebrow">Administration</p>
+            <h1 className="app-page-title mt-1">
+              User <span className="text-primary">management</span>
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage accounts, roles, and access across the organization
+              {!isLoading && (
+                <span className="font-medium text-foreground">
+                  {" "}
+                  · {allUsers.length} user{allUsers.length === 1 ? "" : "s"}
+                </span>
+              )}
+            </p>
+          </div>
+          <Button className="h-10 shrink-0 rounded-xl shadow-sm" onClick={() => setAddUserOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-1.5" /> Add user
+          </Button>
+        </div>
 
-        {/* Add User Dialog */}
+        {/* Add user dialog */}
         <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
-          <DialogContent className="sm:max-w-[460px] rounded-2xl border-0 shadow-2xl p-0">
-            <div className="px-6 py-6 bg-muted/30 border-b border-border">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-display">Add New User</DialogTitle>
-                <DialogDescription>Create an account with the default password <span className="font-mono font-semibold text-foreground">dostro2</span>. The user will be prompted to change it on first login.</DialogDescription>
+          <DialogContent className="sm:max-w-[460px] rounded-2xl border-0 shadow-2xl p-0 overflow-hidden">
+            <div className="relative px-6 py-6 border-b border-border overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.08] via-transparent to-accent/[0.06]" />
+              <DialogHeader className="relative">
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                    <UserPlus className="h-5 w-5" />
+                  </div>
+                  <DialogTitle className="text-xl font-display">Add new user</DialogTitle>
+                </div>
+                <DialogDescription className="pl-[52px]">
+                  Create an account with the default password{" "}
+                  <span className="font-mono font-semibold text-foreground">dostro2</span>. The user will be prompted
+                  to change it on first login.
+                </DialogDescription>
               </DialogHeader>
             </div>
             <div className="p-6 space-y-4">
               <div className="space-y-1.5">
-                <Label>Full Name</Label>
-                <Input placeholder="e.g. Juan dela Cruz" value={newUser.fullName} onChange={e => setNewUser(p => ({ ...p, fullName: e.target.value }))} className="rounded-xl h-11" />
+                <Label>Full name</Label>
+                <Input
+                  placeholder="e.g. Juan dela Cruz"
+                  value={newUser.fullName}
+                  onChange={(e) => setNewUser((p) => ({ ...p, fullName: e.target.value }))}
+                  className="rounded-xl h-10"
+                />
               </div>
               <div className="space-y-1.5">
-                <Label>Email Address</Label>
-                <Input type="email" placeholder="name@dost.gov.ph" value={newUser.email} onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))} className="rounded-xl h-11" />
+                <Label>Email address</Label>
+                <Input
+                  type="email"
+                  placeholder="name@dost.gov.ph"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))}
+                  className="rounded-xl h-10"
+                />
               </div>
               <div className="space-y-1.5">
-                <Label>Department (Optional)</Label>
-                <Input placeholder="e.g. MIS" value={newUser.department} onChange={e => setNewUser(p => ({ ...p, department: e.target.value }))} className="rounded-xl h-11" />
+                <Label>Department (optional)</Label>
+                <Input
+                  placeholder="e.g. MIS"
+                  value={newUser.department}
+                  onChange={(e) => setNewUser((p) => ({ ...p, department: e.target.value }))}
+                  className="rounded-xl h-10"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Role</Label>
-                <Select value={newUser.role} onValueChange={v => setNewUser(p => ({ ...p, role: v }))}>
-                  <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
+                <Select value={newUser.role} onValueChange={(v) => setNewUser((p) => ({ ...p, role: v }))}>
+                  <SelectTrigger className="rounded-xl h-10">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {Object.values(UserRole).map(r => (
-                      <SelectItem key={r} value={r}>{r.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</SelectItem>
+                    {Object.values(UserRole).map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {roleLabel(r)}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex gap-3 pt-2">
-                <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setAddUserOpen(false)}>Cancel</Button>
-                <Button className="flex-1 rounded-xl" disabled={addingUser || !newUser.email || !newUser.fullName} onClick={handleAddUser}>
+              <div className="flex gap-3 pt-2 border-t border-border/50">
+                <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setAddUserOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 rounded-xl"
+                  disabled={addingUser || !newUser.email || !newUser.fullName}
+                  onClick={handleAddUser}
+                >
                   {addingUser ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
-                  Create User
+                  Create user
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
-        <div className="flex items-center gap-2 max-w-xl">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              placeholder="Search users..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 h-11 rounded-xl bg-card border-border/50 shadow-sm"
-            />
-          </div>
-          <Button className="h-11 rounded-xl gap-2 shrink-0" onClick={() => setAddUserOpen(true)}>
-            <UserPlus className="w-4 h-4" /> Add User
-          </Button>
-        </div>
 
-        <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
-          {isLoading ? (
-            <SkeletonTable rows={5} cols={6} />
-          ) : (
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead className="py-4 px-6">User</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="px-6">Role / Access Level</TableHead>
-                  <TableHead className="px-6">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users?.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
-                          {u.fullName.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-bold text-foreground">{u.fullName}</p>
-                          <p className="text-xs text-muted-foreground">{u.email}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {u.department ? <Badge variant="secondary" className="rounded-md font-normal">{u.department}</Badge> : <span className="text-muted-foreground text-sm">-</span>}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(u.createdAt), 'MMM yyyy')}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {(u as any).lastSignInAt
-                        ? <span title={format(new Date((u as any).lastSignInAt), 'MMM d, yyyy h:mm a')}>{formatDistanceToNow(new Date((u as any).lastSignInAt), { addSuffix: true })}</span>
-                        : <span className="italic">Never</span>}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={`rounded-md text-xs font-medium ${(u as any).isActive !== false ? 'border-green-300 text-green-700 bg-green-50 dark:bg-green-900/20 dark:text-green-400' : 'border-red-300 text-red-700 bg-red-50 dark:bg-red-900/20 dark:text-red-400'}`}>
-                          {(u as any).isActive !== false ? 'Active' : 'Inactive'}
-                        </Badge>
-                        {u.id !== user?.id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={`h-7 px-2 rounded-lg text-xs ${(u as any).isActive !== false ? 'text-red-600 hover:bg-red-50 hover:text-red-700' : 'text-green-600 hover:bg-green-50 hover:text-green-700'}`}
-                            disabled={toggleActiveMutation.isPending}
-                            onClick={() => handleToggleActive(u.id, (u as any).isActive !== false)}
-                          >
-                            {(u as any).isActive !== false
-                              ? <><UserX className="w-3 h-3 mr-1" />Deactivate</>
-                              : <><UserCheck className="w-3 h-3 mr-1" />Activate</>}
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-6">
-                      <Select 
-                        value={u.role} 
-                        onValueChange={(val) => handleRoleChange(u.id, val as UserRole)}
-                        disabled={updateMutation.isPending || u.id === user?.id}
-                      >
-                        <SelectTrigger className="w-[180px] h-9 rounded-lg border-border/50 bg-background text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.values(UserRole).map(r => (
-                            <SelectItem key={r} value={r} className="capitalize flex items-center">
-                              {r === 'administrator' && <UserCog className="w-3 h-3 inline mr-2 text-destructive" />}
-                              {r.replace('_', ' ')}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="px-6">
-                      {u.id !== user?.id && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 rounded-lg gap-1.5 text-xs text-amber-700 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-900/20">
-                              <KeyRound className="w-3 h-3" /> Reset Password
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="rounded-2xl">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Reset password for {u.fullName}?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will set their password to <span className="font-mono font-semibold text-foreground">dostro2</span>. They should change it after logging in.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white"
-                                onClick={() => handleResetPassword(u.id)}
-                                disabled={resettingId === u.id}
-                              >
-                                {resettingId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : "Reset Password"}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </Card>
+        <UserToolbar
+          search={search}
+          onSearchChange={setSearch}
+          roleFilter={roleFilter}
+          onRoleFilterChange={setRoleFilter}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={() => {
+            setSearch("");
+            setRoleFilter("all");
+          }}
+        />
+
+        {isLoading ? (
+          <div className="space-y-1.5 rounded-3xl border border-primary/10 bg-white/60 p-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-[72px] rounded-2xl bg-muted/40 animate-pulse" />
+            ))}
+          </div>
+        ) : !filteredUsers.length ? (
+              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-white/75 p-16 text-center shadow-sm">
+                <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/[0.08] ring-1 ring-primary/15">
+                  <Users className="h-8 w-8 text-primary/60" />
+                </div>
+                <h3 className="mb-1.5 font-display text-lg font-semibold text-foreground">
+                  {hasActiveFilters ? "No matching users" : "No users yet"}
+                </h3>
+                <p className="mb-6 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                  {hasActiveFilters
+                    ? "Try adjusting your search or clearing the filters to see more users."
+                    : "Add your first user to get started with team access management."}
+                </p>
+                {!hasActiveFilters ? (
+                  <Button className="gap-2 rounded-xl" onClick={() => setAddUserOpen(true)}>
+                    <UserPlus className="h-4 w-4" /> Add first user
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="gap-2 rounded-xl"
+                    onClick={() => {
+                      setSearch("");
+                      setRoleFilter("all");
+                    }}
+                  >
+                    <X className="h-4 w-4" /> Clear all filters
+                  </Button>
+                )}
+              </div>
+        ) : (
+          <>
+            <UserTeamPanel
+              users={pagedUsers as UserCardData[]}
+              total={filteredUsers.length}
+              currentUserId={user?.id}
+              roleUpdating={updateMutation.isPending}
+              togglePending={toggleActiveMutation.isPending}
+              resettingId={resettingId}
+              onRoleChange={handleRoleChange}
+              onToggleActive={handleToggleActive}
+              onResetPassword={handleResetPassword}
+            />
+            {filteredUsers.length > PAGE_SIZE && (
+              <div className="overflow-hidden rounded-2xl border border-border/50 bg-white/70 shadow-sm">
+                <PaginationBar page={page} pageSize={PAGE_SIZE} total={filteredUsers.length} onPage={setPage} />
+              </div>
+            )}
+          </>
+        )}
       </div>
     </AppLayout>
   );
 }
-

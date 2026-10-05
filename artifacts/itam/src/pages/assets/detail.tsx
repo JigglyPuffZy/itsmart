@@ -7,18 +7,20 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowLeft, ArchiveX, Edit2, MonitorSmartphone, Calendar, User, Save, MapPin, Hash, UserMinus, History, Wrench, Plus } from "lucide-react";
+import { Loader2, ArrowLeft, ArchiveX, Edit2, MonitorSmartphone, Calendar, User, Save, UserMinus, History, Wrench, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { AssetQRLabel } from "@/components/ui/asset-qr-label";
 
@@ -251,110 +253,106 @@ export default function AssetDetail() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 max-w-5xl mx-auto">
-        <div className="flex items-center justify-between">
-          <Link href="/assets" className="flex items-center text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Assets
-          </Link>
-          {isAdmin && !isEditing && (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsEditing(true)} className="rounded-xl shadow-sm">
-                <Edit2 className="w-4 h-4 mr-2" /> Edit Asset
-              </Button>
-              {asset.status !== 'retired' && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => { setRetireRemarks(""); setRetireDialogOpen(true); }}
-                    className="rounded-xl shadow-sm border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20"
-                  >
-                    <ArchiveX className="w-4 h-4 mr-2" /> Retire Asset
-                  </Button>
-                  <Dialog open={retireDialogOpen} onOpenChange={setRetireDialogOpen}>
-                    <DialogContent className="rounded-2xl sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Retire this asset?</DialogTitle>
-                        <DialogDescription>
-                          Asset <span className="font-mono font-semibold text-foreground">{asset.assetTag}</span> will be marked as <span className="font-semibold">Retired</span> and unassigned. The record is preserved for audit purposes. This action can be undone by editing the asset status.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-2 py-2">
-                        <Label htmlFor="retire-remarks" className="text-sm font-medium">
-                          Remarks <span className="text-muted-foreground font-normal">(optional)</span>
-                        </Label>
-                        <Textarea
-                          id="retire-remarks"
-                          placeholder="e.g. End of useful life, hardware failure, replaced by newer unit…"
-                          value={retireRemarks}
-                          onChange={e => setRetireRemarks(e.target.value)}
-                          className="rounded-xl min-h-[90px] resize-none"
-                        />
-                      </div>
-                      <DialogFooter className="gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => setRetireDialogOpen(false)}
-                          className="rounded-xl"
-                          disabled={updateMutation.isPending}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleRetire}
-                          className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl"
-                          disabled={updateMutation.isPending}
-                        >
-                          {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArchiveX className="w-4 h-4 mr-2" />}
-                          Retire Asset
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+      <div className="space-y-6 max-w-6xl mx-auto">
+        <Link href="/assets" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors">
+          <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to assets
+        </Link>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Main card */}
-          <Card className="md:col-span-2 border-border/50 shadow-lg shadow-black/5 rounded-2xl overflow-hidden">
-            <div className="h-24 bg-gradient-to-r from-primary/10 to-accent/10 flex items-center p-6 border-b border-border/50 gap-4">
-              <div className="w-16 h-16 bg-card rounded-2xl border-4 border-card shadow-xl flex items-center justify-center text-primary shrink-0">
-                <MonitorSmartphone className="w-8 h-8" />
+        {/* Hero */}
+        <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.07] via-card to-accent/[0.05] shadow-sm">
+          <div className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-4 min-w-0">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/[0.1] text-primary ring-1 ring-primary/15 shadow-sm">
+                <MonitorSmartphone className="w-7 h-7" />
               </div>
-              <div>
-                <div className="flex items-center gap-3 mb-0.5">
-                  <h2 className="text-xl font-display font-bold text-foreground">{asset.name}</h2>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <h1 className="text-xl md:text-2xl font-display font-bold text-foreground truncate">{asset.name}</h1>
                   <StatusBadge status={asset.status} />
                 </div>
-                <p className="text-muted-foreground font-mono text-sm">{asset.assetTag}</p>
+                <p className="font-mono text-sm text-primary font-semibold">{asset.assetTag}</p>
+                <p className="text-sm text-muted-foreground mt-1 capitalize">
+                  {asset.category}{(a.model ? ` · ${a.model}` : "")}
+                </p>
               </div>
             </div>
+            {isAdmin && !isEditing && (
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Button variant="outline" onClick={() => setIsEditing(true)} className="rounded-xl bg-card/80">
+                  <Edit2 className="w-4 h-4 mr-2" /> Edit
+                </Button>
+                {asset.status !== 'retired' && (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => { setRetireRemarks(""); setRetireDialogOpen(true); }}
+                      className="rounded-xl bg-card/80 border-amber-200 text-amber-700 hover:bg-amber-50"
+                    >
+                      <ArchiveX className="w-4 h-4 mr-2" /> Retire
+                    </Button>
+                    <Dialog open={retireDialogOpen} onOpenChange={setRetireDialogOpen}>
+                      <DialogContent className="rounded-2xl sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Retire this asset?</DialogTitle>
+                          <DialogDescription>
+                            Asset <span className="font-mono font-semibold text-foreground">{asset.assetTag}</span> will be marked as <span className="font-semibold">Retired</span> and unassigned. The record is preserved for audit purposes. This action can be undone by editing the asset status.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-2 py-2">
+                          <Label htmlFor="retire-remarks" className="text-sm font-medium">
+                            Remarks <span className="text-muted-foreground font-normal">(optional)</span>
+                          </Label>
+                          <Textarea
+                            id="retire-remarks"
+                            placeholder="e.g. End of useful life, hardware failure, replaced by newer unit…"
+                            value={retireRemarks}
+                            onChange={e => setRetireRemarks(e.target.value)}
+                            className="rounded-xl min-h-[90px] resize-none"
+                          />
+                        </div>
+                        <DialogFooter className="gap-2">
+                          <Button variant="outline" onClick={() => setRetireDialogOpen(false)} className="rounded-xl" disabled={updateMutation.isPending}>
+                            Cancel
+                          </Button>
+                          <Button onClick={handleRetire} className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl" disabled={updateMutation.isPending}>
+                            {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ArchiveX className="w-4 h-4 mr-2" />}
+                            Retire asset
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
-            {/* Tabs — flush against the banner */}
-            <div className="flex border-b border-border/50 px-8 bg-card">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main card */}
+          <Card className="lg:col-span-2 border-border/60 shadow-sm rounded-2xl overflow-hidden">
+            <div className="flex border-b border-border/50 px-2 bg-muted/20">
               <button
                 onClick={() => setActiveTab("details")}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === "details" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 transition-colors -mb-px rounded-t-lg ${activeTab === "details" ? "border-primary text-primary bg-card" : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"}`}
               >
                 <MonitorSmartphone className="w-4 h-4" /> Details
               </button>
               <button
                 onClick={() => setActiveTab("history")}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === "history" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 transition-colors -mb-px rounded-t-lg ${activeTab === "history" ? "border-primary text-primary bg-card" : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"}`}
               >
                 <History className="w-4 h-4" /> History {history.length > 0 && <span className="ml-1 bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full">{history.length}</span>}
               </button>
               <button
                 onClick={() => setActiveTab("maintenance")}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === "maintenance" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 transition-colors -mb-px rounded-t-lg ${activeTab === "maintenance" ? "border-primary text-primary bg-card" : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"}`}
               >
                 <Wrench className="w-4 h-4" /> Maintenance {maintenanceLog.length > 0 && <span className="ml-1 bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full">{maintenanceLog.length}</span>}
               </button>
             </div>
 
-            <CardContent className="px-8 pb-8 pt-6">
+            <CardContent className="px-6 md:px-8 pb-8 pt-6">
               {activeTab === "details" ? (
                 isEditing ? (
                 <Form {...form}>
@@ -403,16 +401,16 @@ export default function AssetDetail() {
                         </FormItem>
                       )} />
                       <FormField control={form.control} name="purchaseDate" render={({ field }) => (
-                        <FormItem><FormLabel>Purchase Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Purchase Date</FormLabel><FormControl><DateInput {...field} value={field.value ?? ''} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
                       )} />
                       <FormField control={form.control} name="purchaseValue" render={({ field }) => (
                         <FormItem><FormLabel>Purchase Value (₱)</FormLabel><FormControl><Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
                       )} />
                       <FormField control={form.control} name="lastPmDate" render={({ field }) => (
-                        <FormItem><FormLabel>Last PM Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Last PM Date</FormLabel><FormControl><DateInput {...field} value={field.value ?? ''} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
                       )} />
                       <FormField control={form.control} name="nextPmDate" render={({ field }) => (
-                        <FormItem><FormLabel>Next PM Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Next PM Date</FormLabel><FormControl><DateInput {...field} value={field.value ?? ''} className="rounded-xl" /></FormControl><FormMessage /></FormItem>
                       )} />
                     </div>
                     <FormField control={form.control} name="notes" render={({ field }) => (
@@ -427,19 +425,33 @@ export default function AssetDetail() {
                   </form>
                 </Form>
               ) : (
-                <div className="grid grid-cols-2 gap-y-6 gap-x-8 text-sm">
-                  <div><p className="text-muted-foreground mb-1">Category</p><p className="font-medium text-base">{asset.category.charAt(0).toUpperCase() + asset.category.slice(1)}</p></div>
-                  <div><p className="text-muted-foreground mb-1">Model</p><p className="font-medium text-base">{a.model || <span className="text-muted-foreground italic font-normal">—</span>}</p></div>
-                  <div><p className="text-muted-foreground mb-1 flex items-center gap-1"><Hash className="w-3 h-3" />Serial Number</p><p className="font-medium font-mono text-base">{a.serialNumber || <span className="text-muted-foreground italic font-normal">—</span>}</p></div>
-                  <div><p className="text-muted-foreground mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" />Location</p><p className="font-medium text-base">{a.location || <span className="text-muted-foreground italic font-normal">—</span>}</p></div>
-                  <div><p className="text-muted-foreground mb-1">Purchase Date</p><p className="font-medium text-base">{asset.purchaseDate ? format(new Date(asset.purchaseDate), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">—</span>}</p></div>
-                  <div><p className="text-muted-foreground mb-1">Purchase Value</p><p className="font-medium text-base">{a.purchaseValue != null ? `₱${Number(a.purchaseValue).toLocaleString()}` : <span className="text-muted-foreground italic font-normal">—</span>}</p></div>
-                  <div><p className="text-muted-foreground mb-1">Last PM Date</p><p className="font-medium text-base">{a.lastPmDate ? format(new Date(a.lastPmDate), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">—</span>}</p></div>
-                  <div><p className="text-muted-foreground mb-1">Next PM Date</p><p className={`font-medium text-base ${a.nextPmDate && new Date(a.nextPmDate) < new Date() ? 'text-red-600 dark:text-red-400' : ''}`}>{a.nextPmDate ? format(new Date(a.nextPmDate), 'MMMM d, yyyy') : <span className="text-muted-foreground italic font-normal">—</span>}{a.nextPmDate && new Date(a.nextPmDate) < new Date() && <span className="ml-2 text-xs font-medium text-red-600 dark:text-red-400">Overdue</span>}</p></div>
-                  <div className="col-span-2">
-                    <p className="text-muted-foreground mb-2">Notes</p>
-                    <p className="font-medium bg-muted/30 p-4 rounded-xl border border-border/50 min-h-[80px] whitespace-pre-wrap">
-                      {asset.notes || <span className="text-muted-foreground italic font-normal">No additional notes provided.</span>}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[
+                    { label: "Category", value: asset.category.charAt(0).toUpperCase() + asset.category.slice(1) },
+                    { label: "Model", value: a.model || null },
+                    { label: "Serial number", value: a.serialNumber || null, mono: true },
+                    { label: "Location", value: a.location || null },
+                    { label: "Purchase date", value: asset.purchaseDate ? format(new Date(asset.purchaseDate), 'MMM d, yyyy') : null },
+                    { label: "Purchase value", value: a.purchaseValue != null ? `₱${Number(a.purchaseValue).toLocaleString()}` : null },
+                    { label: "Last PM", value: a.lastPmDate ? format(new Date(a.lastPmDate), 'MMM d, yyyy') : null },
+                    {
+                      label: "Next PM",
+                      value: a.nextPmDate ? format(new Date(a.nextPmDate), 'MMM d, yyyy') : null,
+                      warn: a.nextPmDate && new Date(a.nextPmDate) < new Date(),
+                    },
+                  ].map(({ label, value, mono, warn }) => (
+                    <div key={label} className="rounded-xl border border-border/50 bg-muted/15 px-4 py-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">{label}</p>
+                      <p className={cn("text-sm font-semibold text-foreground", mono && "font-mono", warn && "text-red-600")}>
+                        {value ?? <span className="text-muted-foreground italic font-normal">Not set</span>}
+                        {warn && <span className="ml-2 text-xs font-medium text-red-600">Overdue</span>}
+                      </p>
+                    </div>
+                  ))}
+                  <div className="sm:col-span-2 rounded-xl border border-border/50 bg-muted/15 px-4 py-3">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Notes</p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                      {asset.notes || <span className="text-muted-foreground italic">No additional notes.</span>}
                     </p>
                   </div>
                 </div>
@@ -513,7 +525,7 @@ export default function AssetDetail() {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <label className="text-xs font-medium text-muted-foreground">Date Performed</label>
-                          <Input type="date" value={newPmDate} onChange={e => setNewPmDate(e.target.value)} className="rounded-xl h-9 text-sm" />
+                          <DateInput value={newPmDate} onChange={e => setNewPmDate(e.target.value)} className="rounded-xl h-9 text-sm" />
                         </div>
                         <div className="space-y-1">
                           <label className="text-xs font-medium text-muted-foreground">Performed By</label>
@@ -568,10 +580,10 @@ export default function AssetDetail() {
           </Card>
 
           {/* Sidebar */}
-          <div className="space-y-6">
-            <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl">
-              <CardHeader className="border-b border-border/50 py-4 px-6">
-                <CardTitle className="text-base font-display flex items-center gap-2"><User className="w-5 h-5 text-primary" /> Assignment</CardTitle>
+          <div className="space-y-5">
+            <Card className="border-border/60 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="border-b border-border/50 py-4 px-5 bg-muted/20">
+                <CardTitle className="text-sm font-display font-semibold flex items-center gap-2"><User className="w-4 h-4 text-primary" /> Assignment</CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
                 {asset.assignedTo ? (
@@ -639,18 +651,18 @@ export default function AssetDetail() {
               </CardContent>
             </Card>
 
-            <Card className="border-border/50 shadow-lg shadow-black/5 rounded-2xl">
-              <CardHeader className="border-b border-border/50 py-4 px-6">
-                <CardTitle className="text-base font-display flex items-center gap-2"><Calendar className="w-5 h-5 text-primary" /> Timeline</CardTitle>
+            <Card className="border-border/60 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="border-b border-border/50 py-4 px-5 bg-muted/20">
+                <CardTitle className="text-sm font-display font-semibold flex items-center gap-2"><Calendar className="w-4 h-4 text-primary" /> Timeline</CardTitle>
               </CardHeader>
-              <CardContent className="p-6 space-y-4 text-sm">
-                <div className="flex justify-between items-center pb-4 border-b border-border/50">
+              <CardContent className="p-5 space-y-3 text-sm">
+                <div className="flex justify-between items-center py-2 border-b border-border/40">
                   <span className="text-muted-foreground">Created</span>
-                  <span className="font-medium">{format(new Date(asset.createdAt), 'MMM d, yyyy')}</span>
+                  <span className="font-medium tabular-nums">{format(new Date(asset.createdAt), 'MMM d, yyyy')}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Last Updated</span>
-                  <span className="font-medium">{format(new Date(asset.updatedAt), 'MMM d, yyyy')}</span>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-muted-foreground">Last updated</span>
+                  <span className="font-medium tabular-nums">{format(new Date(asset.updatedAt), 'MMM d, yyyy')}</span>
                 </div>
               </CardContent>
             </Card>
