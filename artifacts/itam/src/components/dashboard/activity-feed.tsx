@@ -53,7 +53,7 @@ function TicketCard({
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={ticket.status} />
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground ring-1 ring-border/40">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-card/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground ring-1 ring-border/40">
             <span className={cn("h-1.5 w-1.5 rounded-full", priorityDot(ticket.priority))} />
             {ticket.priority}
           </span>
@@ -109,7 +109,7 @@ export function ActivityFeed({ tickets, title }: ActivityFeedProps) {
         </div>
         <Link
           href="/tickets"
-          className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-white/80 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:border-primary/30 hover:text-primary"
+          className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card/80 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:border-primary/30 hover:text-primary"
         >
           View all
           <ChevronRight className="h-3 w-3" />

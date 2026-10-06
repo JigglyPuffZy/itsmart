@@ -263,13 +263,13 @@ export default function UsersManagement() {
         />
 
         {isLoading ? (
-          <div className="space-y-1.5 rounded-3xl border border-primary/10 bg-white/60 p-2">
+          <div className="space-y-1.5 rounded-3xl border border-primary/10 bg-card/60 p-2">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-[72px] rounded-2xl bg-muted/40 animate-pulse" />
             ))}
           </div>
         ) : !filteredUsers.length ? (
-              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-white/75 p-16 text-center shadow-sm">
+              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-card/75 p-16 text-center shadow-sm">
                 <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/[0.08] ring-1 ring-primary/15">
                   <Users className="h-8 w-8 text-primary/60" />
                 </div>
@@ -312,7 +312,7 @@ export default function UsersManagement() {
               onResetPassword={handleResetPassword}
             />
             {filteredUsers.length > PAGE_SIZE && (
-              <div className="overflow-hidden rounded-2xl border border-border/50 bg-white/70 shadow-sm">
+              <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/70 shadow-sm">
                 <PaginationBar page={page} pageSize={PAGE_SIZE} total={filteredUsers.length} onPage={setPage} />
               </div>
             )}

@@ -243,7 +243,7 @@ export default function TicketDetail() {
     if (!ticket) return;
     const win = window.open('', '_blank', 'width=800,height=900');
     if (!win) return;
-    const comments = ticket.comments.map(c => `
+    const comments = ticket.comments.map((c: { createdBy: { fullName: string }; createdAt: string; commentText: string }) => `
       <div style="margin-bottom:12px;padding:10px;border:1px solid #e2e8f0;border-radius:8px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
           <strong>${c.createdBy.fullName}</strong>
@@ -524,7 +524,7 @@ export default function TicketDetail() {
                       className="absolute left-[27px] top-6 bottom-6 w-px bg-border/70"
                     />
                     <div className="space-y-1">
-                      {ticket.comments.map((comment) => {
+                      {ticket.comments.map((comment: { id: string; commentText: string; createdAt: string; createdBy: { fullName: string } }) => {
                         const isSystemEntry = /^[🔄👤🔓⬆️⬇️✅📝]/.test(comment.commentText);
                         if (isSystemEntry) {
                           return (

@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "./lib/auth-context";
 import { NotificationsProvider } from "./lib/notifications-context";
+import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Loader2 } from "lucide-react";
 
 // Pages
@@ -82,18 +83,20 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthProvider>
-            <NotificationsProvider>
-              <Router />
-              <Toaster />
-            </NotificationsProvider>
-          </AuthProvider>
-        </WouterRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <AuthProvider>
+              <NotificationsProvider>
+                <Router />
+                <Toaster />
+              </NotificationsProvider>
+            </AuthProvider>
+          </WouterRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

@@ -138,6 +138,60 @@
   --chart-5: 0 84% 60%;
 }
 
+.dark {
+  --background: 207 28% 9%;
+  --foreground: 210 25% 96%;
+
+  --card: 207 26% 12%;
+  --card-foreground: 210 25% 96%;
+  --card-border: 207 22% 18%;
+
+  --popover: 207 26% 12%;
+  --popover-foreground: 210 25% 96%;
+  --popover-border: 207 22% 20%;
+
+  --primary: 207 55% 62%;
+  --primary-foreground: 207 28% 9%;
+  --primary-border: 207 55% 52%;
+
+  --secondary: 207 22% 18%;
+  --secondary-foreground: 210 25% 92%;
+  --secondary-border: 207 22% 24%;
+
+  --muted: 207 22% 16%;
+  --muted-foreground: 207 18% 62%;
+  --muted-border: 207 22% 22%;
+
+  --accent: 207 55% 55%;
+  --accent-foreground: 207 28% 9%;
+  --accent-border: 207 55% 45%;
+
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 210 40% 98%;
+  --destructive-border: 0 72% 45%;
+
+  --border: 207 22% 20%;
+  --input: 207 22% 20%;
+  --ring: 207 55% 62%;
+
+  --sidebar: 207 28% 11%;
+  --sidebar-foreground: 210 25% 96%;
+  --sidebar-border: 207 22% 18%;
+  --sidebar-primary: 207 55% 62%;
+  --sidebar-primary-foreground: 207 28% 9%;
+  --sidebar-primary-border: 207 55% 52%;
+  --sidebar-accent: 207 22% 16%;
+  --sidebar-accent-foreground: 210 25% 96%;
+  --sidebar-accent-border: 207 22% 22%;
+  --sidebar-ring: 207 55% 62%;
+
+  --chart-1: 207 55% 62%;
+  --chart-2: 207 38% 45%;
+  --chart-3: 142 60% 50%;
+  --chart-4: 38 85% 55%;
+  --chart-5: 0 72% 55%;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -168,8 +222,12 @@
   }
 
   input.date-input {
-    color-scheme: light;
+    color-scheme: light dark;
     appearance: none;
+  }
+
+  .dark input.date-input {
+    color-scheme: dark;
   }
 
   input.date-input::-webkit-calendar-picker-indicator {
@@ -241,20 +299,20 @@
 
 /* Glass surface utilities */
 .glass-card {
-  @apply rounded-2xl border border-primary/10 bg-white/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(53,88,114,0.06)];
+  @apply rounded-2xl border border-primary/10 bg-card/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(53,88,114,0.06)] dark:border-white/10 dark:shadow-[0_8px_32px_rgba(0,0,0,0.25)];
 }
 
 .glass-panel {
-  @apply rounded-2xl border border-primary/10 bg-white/75 backdrop-blur-lg shadow-[0_4px_24px_rgba(53,88,114,0.05)];
+  @apply rounded-2xl border border-primary/10 bg-card/75 backdrop-blur-lg shadow-[0_4px_24px_rgba(53,88,114,0.05)] dark:border-white/10 dark:shadow-[0_4px_24px_rgba(0,0,0,0.2)];
 }
 
 /* App-wide primary-tinted surfaces */
 .app-surface {
-  @apply rounded-2xl border border-primary/10 bg-white/80 backdrop-blur-sm shadow-[0_4px_24px_rgba(53,88,114,0.06)];
+  @apply rounded-2xl border border-primary/10 bg-card/80 backdrop-blur-sm shadow-[0_4px_24px_rgba(53,88,114,0.06)] dark:border-white/10 dark:bg-card/60 dark:shadow-[0_4px_24px_rgba(0,0,0,0.2)];
 }
 
 .app-sidebar-panel {
-  @apply rounded-3xl border border-primary/10 bg-gradient-to-b from-white via-primary/[0.02] to-primary/[0.07] shadow-[0_8px_32px_rgba(53,88,114,0.07)];
+  @apply rounded-3xl border border-primary/10 bg-gradient-to-b from-card via-primary/[0.02] to-primary/[0.07] shadow-[0_8px_32px_rgba(53,88,114,0.07)] dark:border-white/10 dark:from-card dark:via-primary/[0.04] dark:to-primary/[0.1] dark:shadow-[0_8px_32px_rgba(0,0,0,0.25)];
 }
 
 .app-page-eyebrow {
@@ -270,7 +328,7 @@
 }
 
 .bento-tile {
-  @apply rounded-2xl border border-white/50 bg-white/75 backdrop-blur-xl shadow-[0_4px_20px_rgba(53,88,114,0.05)] transition-all duration-300;
+  @apply rounded-2xl border border-border/50 bg-card/75 backdrop-blur-xl shadow-[0_4px_20px_rgba(53,88,114,0.05)] transition-all duration-300 dark:border-white/10 dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)];
 }
 
 .bento-tile:hover {

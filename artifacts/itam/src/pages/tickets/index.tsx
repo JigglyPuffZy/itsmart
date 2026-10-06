@@ -154,10 +154,10 @@ export default function TicketsList() {
     let base = data?.data ?? [];
     // Multi-status filter: resolved + closed together (from dashboard "Resolved & Closed" card)
     if (resolvedClosed) {
-      base = base.filter(t => t.status === 'resolved' || t.status === 'closed');
+      base = base.filter((t: { status: string }) => t.status === 'resolved' || t.status === 'closed');
     }
     if (isAdmin && assigneeFilter === "unassigned") {
-      base = base.filter(t => !t.assignedTo);
+      base = base.filter((t) => !t.assignedTo);
     }
     return base;
   }, [data, isAdmin, assigneeFilter, resolvedClosed]);
@@ -174,11 +174,11 @@ export default function TicketsList() {
   const summary = useMemo(
     () => ({
       total: baseForSummary.length,
-      open: baseForSummary.filter((t) => t.status === "open").length,
-      inProgress: baseForSummary.filter((t) => t.status === "in_progress").length,
-      onHold: baseForSummary.filter((t) => t.status === "on_hold").length,
+      open: baseForSummary.filter((t: { status: string }) => t.status === "open").length,
+      inProgress: baseForSummary.filter((t: { status: string }) => t.status === "in_progress").length,
+      onHold: baseForSummary.filter((t: { status: string }) => t.status === "on_hold").length,
       resolvedClosed: baseForSummary.filter(
-        (t) => t.status === "resolved" || t.status === "closed"
+        (t: { status: string }) => t.status === "resolved" || t.status === "closed"
       ).length,
     }),
     [baseForSummary]
@@ -251,7 +251,7 @@ export default function TicketsList() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-2xl border border-border/50 bg-white/70 p-1 shadow-sm backdrop-blur-sm">
+            <div className="flex rounded-2xl border border-border/50 bg-card/70 p-1 shadow-sm backdrop-blur-sm">
               <button
                 type="button"
                 onClick={() => {
@@ -334,7 +334,7 @@ export default function TicketsList() {
                                       className={cn("w-full rounded-xl justify-between font-normal h-10", !field.value && "text-muted-foreground")}
                                     >
                                       {field.value
-                                        ? (() => { const a = assets?.data?.find(a => a.id === field.value); return a ? `${a.name} (${a.assetTag})` : "Select asset..."; })()
+                                        ? (() => { const a = assets?.data?.find((asset: { id: string; name: string; assetTag: string }) => asset.id === field.value); return a ? `${a.name} (${a.assetTag})` : "Select asset..."; })()
                                         : "None — search by name, tag, or category"}
                                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
@@ -354,7 +354,7 @@ export default function TicketsList() {
                                           <Check className={cn("mr-2 h-4 w-4", !field.value ? "opacity-100" : "opacity-0")} />
                                           None
                                         </CommandItem>
-                                        {assets?.data?.map(a => (
+                                        {assets?.data?.map((a: { id: string; name: string; assetTag: string; category: string }) => (
                                           <CommandItem
                                             key={a.id}
                                             value={`${a.name} ${a.assetTag} ${a.category}`}
@@ -435,13 +435,13 @@ export default function TicketsList() {
             />
 
             {isLoading ? (
-              <div className="space-y-2 rounded-3xl border border-white/60 bg-white/60 p-2">
+              <div className="space-y-2 rounded-3xl border border-border/60 bg-card/60 p-2">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="h-[72px] rounded-xl bg-muted/40 animate-pulse" />
                 ))}
               </div>
             ) : !allTickets.length ? (
-              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-white/75 p-16 text-center shadow-sm">
+              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-card/75 p-16 text-center shadow-sm">
                 <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/[0.08] ring-1 ring-primary/15">
                   <TicketIcon className="h-8 w-8 text-primary/60" />
                 </div>
@@ -483,7 +483,7 @@ export default function TicketsList() {
                   total={allTickets.length}
                   typeLabels={typeLabels}
                 />
-                <div className="overflow-hidden rounded-2xl border border-border/50 bg-white/70 shadow-sm">
+                <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/70 shadow-sm">
                   <PaginationBar page={page} pageSize={PAGE_SIZE} total={allTickets.length} onPage={setPage} />
                 </div>
               </>

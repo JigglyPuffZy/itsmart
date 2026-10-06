@@ -103,8 +103,8 @@ export function AssetSummaryStrip({
               className={cn(
                 "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition-all",
                 selected
-                  ? "bg-white shadow-md ring-1 ring-primary/20"
-                  : "hover:bg-white/70"
+                  ? "bg-card shadow-md ring-1 ring-primary/20"
+                  : "hover:bg-card/70"
               )}
             >
               <span className="flex items-center gap-2.5">

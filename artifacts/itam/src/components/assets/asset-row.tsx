@@ -65,8 +65,8 @@ export function AssetRow({ asset, index = 0 }: AssetRowProps) {
       <Link href={`/assets/${asset.id}`}>
         <article
           className={cn(
-            "group relative flex cursor-pointer items-center gap-3 rounded-2xl border border-primary/8 bg-white/70 px-3 py-3.5 transition-all sm:gap-4 sm:px-4",
-            "hover:border-primary/20 hover:bg-white hover:shadow-[0_8px_24px_rgba(53,88,114,0.08)] hover:-translate-y-px"
+            "group relative flex cursor-pointer items-center gap-3 rounded-2xl border border-primary/8 bg-card/70 px-3 py-3.5 transition-all sm:gap-4 sm:px-4 dark:border-white/10 dark:bg-card/50",
+            "hover:border-primary/20 hover:bg-card hover:shadow-[0_8px_24px_rgba(53,88,114,0.08)] hover:-translate-y-px dark:hover:bg-card/70 dark:hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
           )}
         >
           {/* Icon + status dot */}

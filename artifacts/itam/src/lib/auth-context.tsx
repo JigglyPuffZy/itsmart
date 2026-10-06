@@ -193,14 +193,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error;
     }
     if (data.user) {
-      supabase.from('profiles').upsert({
-        id: data.user.id,
-        full_name: fullName,
-        department: department ?? null,
-        role: 'general_user',
-      }, { onConflict: 'id' }).then(() => {}).catch((err) => {
-        console.error('[register] profile upsert failed:', err);
-      });
+      const userId = data.user.id;
+      void (async () => {
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: userId,
+          full_name: fullName,
+          department: department ?? null,
+          role: 'general_user',
+        }, { onConflict: 'id' });
+        if (profileError) {
+          console.error('[register] profile upsert failed:', profileError);
+        }
+      })();
     }
     toast({ title: "Account created", description: "Welcome to ITAM." });
   };

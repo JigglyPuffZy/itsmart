@@ -142,6 +142,11 @@ export interface Category {
   createdAt: string;
 }
 
+export interface CreateCategoryRequest {
+  name: string;
+  type?: string;
+}
+
 export interface DashboardStats {
   totalAssets: number;
   assignedAssets: number;

@@ -88,7 +88,7 @@ export default function Dashboard() {
     );
   }
 
-  const statsRecord = stats as Record<string, number>;
+  const statsRecord = stats as unknown as Record<string, number>;
   const metrics = buildDashboardMetrics(statsRecord, user.role, user.id);
 
   const ticketsTitle = isGeneral ? "My recent tickets" : "Recent tickets";
