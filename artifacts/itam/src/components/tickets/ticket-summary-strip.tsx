@@ -164,8 +164,8 @@ export function TicketSummaryStrip({
               className={cn(
                 "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition-all duration-200",
                 isSelected
-                  ? cn("shadow-md ring-1 ring-primary/20", selected ?? "bg-white")
-                  : "hover:bg-white/80"
+                  ? cn("shadow-md ring-1 ring-primary/20", selected ?? "bg-card")
+                  : "hover:bg-card/80"
               )}
             >
               <span className="flex items-center gap-2.5">

@@ -64,7 +64,7 @@ export function TicketToolbar({
           placeholder="Search by title, ticket no., or requester..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="h-11 rounded-xl border-primary/10 bg-white/90 pl-10 shadow-sm transition-shadow focus-visible:shadow-md focus-visible:ring-primary/20"
+          className="h-11 rounded-xl border-primary/10 bg-background/90 pl-10 shadow-sm transition-shadow focus-visible:shadow-md focus-visible:ring-primary/20 dark:bg-background/60"
         />
       </div>
 

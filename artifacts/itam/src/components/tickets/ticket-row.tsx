@@ -20,36 +20,36 @@ const STATUS_THEME: Record<
 > = {
   open: {
     accent: "bg-amber-500",
-    chip: "bg-amber-500/12 text-amber-800 ring-amber-500/25",
-    icon: "from-amber-500/20 via-amber-500/8 to-white text-amber-700 ring-amber-500/20",
+    chip: "bg-amber-500/12 text-amber-800 ring-amber-500/25 dark:text-amber-300",
+    icon: "from-amber-500/20 via-amber-500/8 to-card text-amber-700 ring-amber-500/20 dark:text-amber-300",
     glow: "group-hover:shadow-[0_8px_28px_rgba(245,158,11,0.12)]",
     label: "Open",
   },
   in_progress: {
     accent: "bg-sky-500",
-    chip: "bg-sky-500/12 text-sky-800 ring-sky-500/25",
-    icon: "from-sky-500/20 via-sky-500/8 to-white text-sky-700 ring-sky-500/20",
+    chip: "bg-sky-500/12 text-sky-800 ring-sky-500/25 dark:text-sky-300",
+    icon: "from-sky-500/20 via-sky-500/8 to-card text-sky-700 ring-sky-500/20 dark:text-sky-300",
     glow: "group-hover:shadow-[0_8px_28px_rgba(14,165,233,0.12)]",
     label: "In progress",
   },
   on_hold: {
     accent: "bg-violet-400",
-    chip: "bg-violet-500/12 text-violet-800 ring-violet-500/25",
-    icon: "from-violet-500/20 via-violet-500/8 to-white text-violet-700 ring-violet-500/20",
+    chip: "bg-violet-500/12 text-violet-800 ring-violet-500/25 dark:text-violet-300",
+    icon: "from-violet-500/20 via-violet-500/8 to-card text-violet-700 ring-violet-500/20 dark:text-violet-300",
     glow: "group-hover:shadow-[0_8px_28px_rgba(139,92,246,0.12)]",
     label: "On hold",
   },
   resolved: {
     accent: "bg-emerald-500",
-    chip: "bg-emerald-500/12 text-emerald-800 ring-emerald-500/25",
-    icon: "from-emerald-500/20 via-emerald-500/8 to-white text-emerald-700 ring-emerald-500/20",
+    chip: "bg-emerald-500/12 text-emerald-800 ring-emerald-500/25 dark:text-emerald-300",
+    icon: "from-emerald-500/20 via-emerald-500/8 to-card text-emerald-700 ring-emerald-500/20 dark:text-emerald-300",
     glow: "group-hover:shadow-[0_8px_28px_rgba(16,185,129,0.12)]",
     label: "Resolved",
   },
   closed: {
     accent: "bg-slate-400",
-    chip: "bg-slate-500/10 text-slate-600 ring-slate-400/25",
-    icon: "from-slate-500/15 via-slate-500/5 to-white text-slate-600 ring-slate-400/20",
+    chip: "bg-slate-500/10 text-slate-600 ring-slate-400/25 dark:text-slate-300",
+    icon: "from-slate-500/15 via-slate-500/5 to-card text-slate-600 ring-slate-400/20 dark:text-slate-300",
     glow: "group-hover:shadow-[0_8px_28px_rgba(100,116,139,0.1)]",
     label: "Closed",
   },
@@ -89,8 +89,8 @@ export function TicketRow({ ticket, typeLabel, index = 0 }: TicketRowProps) {
       <Link href={`/tickets/${ticket.id}`}>
         <article
           className={cn(
-            "group relative flex cursor-pointer items-stretch gap-0 overflow-hidden rounded-2xl border border-primary/[0.07] bg-white/80 backdrop-blur-sm transition-all duration-300",
-            "hover:border-primary/15 hover:bg-white hover:-translate-y-0.5",
+            "group relative flex cursor-pointer items-stretch gap-0 overflow-hidden rounded-2xl border border-primary/[0.07] bg-card/80 backdrop-blur-sm transition-all duration-300 dark:border-white/10 dark:bg-card/50",
+            "hover:border-primary/15 hover:bg-card hover:-translate-y-0.5 dark:hover:bg-card/70",
             theme.glow
           )}
         >

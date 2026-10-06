@@ -28,7 +28,7 @@ export function TrendPanel({ data, weeks, onWeeksChange, compact = false }: Tren
           </div>
         </div>
         <Select value={String(weeks)} onValueChange={(v) => onWeeksChange(Number(v))}>
-          <SelectTrigger className="h-7 w-[88px] rounded-full border-border/60 bg-white/80 text-[11px] shadow-sm">
+          <SelectTrigger className="h-7 w-[88px] rounded-full border-border/60 bg-card/80 text-[11px] shadow-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -123,10 +123,10 @@ export default function AssetsList() {
   const summary = useMemo(
     () => ({
       total: allAssets.length,
-      active: allAssets.filter((a) => a.status === "active").length,
-      inactive: allAssets.filter((a) => a.status === "inactive").length,
-      maintenance: allAssets.filter((a) => a.status === "maintenance").length,
-      retired: allAssets.filter((a) => a.status === "retired").length,
+      active: allAssets.filter((a: { status: string }) => a.status === "active").length,
+      inactive: allAssets.filter((a: { status: string }) => a.status === "inactive").length,
+      maintenance: allAssets.filter((a: { status: string }) => a.status === "maintenance").length,
+      retired: allAssets.filter((a: { status: string }) => a.status === "retired").length,
     }),
     [allAssets]
   );
@@ -176,7 +176,7 @@ export default function AssetsList() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-2xl border border-border/50 bg-white/70 p-1 shadow-sm backdrop-blur-sm">
+            <div className="flex rounded-2xl border border-border/50 bg-card/70 p-1 shadow-sm backdrop-blur-sm">
               <button
                 type="button"
                 onClick={() => {
@@ -333,13 +333,13 @@ export default function AssetsList() {
             />
 
             {isLoading ? (
-              <div className="space-y-2 rounded-3xl border border-white/60 bg-white/60 p-2">
+              <div className="space-y-2 rounded-3xl border border-border/60 bg-card/60 p-2">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="h-16 rounded-xl bg-muted/40 animate-pulse" />
                 ))}
               </div>
             ) : !allAssets.length ? (
-              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-white/75 p-16 text-center shadow-sm">
+              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/50 bg-card/75 p-16 text-center shadow-sm">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/[0.06] ring-1 ring-primary/10">
                   <MonitorSmartphone className="h-8 w-8 text-primary/40" />
                 </div>
@@ -369,7 +369,7 @@ export default function AssetsList() {
             ) : (
               <>
                 <AssetInventoryList assets={pagedAssets as any} total={allAssets.length} />
-                <div className="overflow-hidden rounded-2xl border border-border/50 bg-white/70 shadow-sm">
+                <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/70 shadow-sm">
                   <PaginationBar page={page} pageSize={PAGE_SIZE} total={allAssets.length} onPage={setPage} />
                 </div>
               </>

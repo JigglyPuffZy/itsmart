@@ -373,8 +373,8 @@ export function ReportsPreview({ isActive }: { isActive: boolean }) {
               cx={TIP_X}
               animate={{
                 opacity: [0, 0, 1, 1, 0],
-                scale: [0, 0, 1, [1, 1.4, 1], 0],
-                cy: [TIP_Y, TIP_Y, TIP_Y, [TIP_Y, TIP_Y - 1.5, TIP_Y + 0.8, TIP_Y], TIP_Y],
+                scale: [0, 0, 1, 1.2, 0],
+                cy: [TIP_Y, TIP_Y, TIP_Y, TIP_Y - 1, TIP_Y],
               }}
               transition={{
                 duration: cycleDuration,

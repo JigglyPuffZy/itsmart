@@ -117,7 +117,7 @@ export function TeamWorkloadStrip({ staff }: TeamWorkloadStripProps) {
             >
               <div
                 className={cn(
-                  "relative flex h-14 w-14 items-center justify-center rounded-full bg-white/80 p-0.5 transition-transform duration-300 hover:scale-105",
+                  "relative flex h-14 w-14 items-center justify-center rounded-full bg-card/80 p-0.5 transition-transform duration-300 hover:scale-105",
                   colors.glow
                 )}
               >

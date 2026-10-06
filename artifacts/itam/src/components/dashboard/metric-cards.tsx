@@ -89,7 +89,7 @@ export function MetricGrid({ metrics }: MetricGridProps) {
               <article
                 className={cn(
                   "group relative flex h-full flex-col overflow-hidden rounded-2xl border border-primary/10",
-                  "bg-white/80 backdrop-blur-xl p-4 transition-all duration-300",
+                  "bg-card/80 backdrop-blur-xl p-4 transition-all duration-300",
                   "hover:border-primary/25 hover:shadow-[0_16px_48px_rgba(53,88,114,0.12)] hover:-translate-y-1",
                   "shadow-[0_4px_20px_rgba(53,88,114,0.05)]"
                 )}

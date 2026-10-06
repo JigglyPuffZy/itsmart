@@ -95,7 +95,7 @@ export function WelcomeBanner({ user }: WelcomeBannerProps) {
               <Button
                 size="lg"
                 variant="outline"
-                className="h-11 w-full gap-2 rounded-2xl border-primary/20 bg-white/80 px-6 text-primary hover:bg-primary/[0.06] sm:w-auto"
+                className="h-11 w-full gap-2 rounded-2xl border-primary/20 bg-card/80 px-6 text-primary hover:bg-primary/[0.06] sm:w-auto"
               >
                 Browse assets
                 <ArrowUpRight className="h-4 w-4" />

@@ -150,7 +150,7 @@ export function MetricStrip({ metrics }: MetricStripProps) {
 
                   "border-white/80 shadow-[0_4px_20px_rgba(53,88,114,0.06)] backdrop-blur-sm",
 
-                  "transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/90 hover:shadow-[0_12px_32px_rgba(53,88,114,0.1)]",
+                  "transition-all duration-300 hover:-translate-y-0.5 hover:bg-card/90 hover:shadow-[0_12px_32px_rgba(53,88,114,0.1)]",
 
                   accent.surface,
 

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationsBell } from "@/components/ui/notifications-bell";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -65,8 +66,8 @@ export function FloatingNav() {
         <div
           className={cn(
             "mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-4 rounded-2xl px-4 md:px-5",
-            "border border-primary/10 bg-white/85 shadow-[0_8px_32px_rgba(53,88,114,0.08)] backdrop-blur-xl",
-            "dark:border-white/10 dark:bg-white/5"
+            "border border-primary/10 bg-card/85 shadow-[0_8px_32px_rgba(53,88,114,0.08)] backdrop-blur-xl",
+            "dark:border-white/10 dark:bg-card/70 dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
           )}
         >
           {/* Brand */}
@@ -98,7 +99,7 @@ export function FloatingNav() {
                     {active && (
                       <motion.span
                         layoutId="nav-pill"
-                        className="absolute inset-0 rounded-full bg-white shadow-sm ring-1 ring-primary/15"
+                        className="absolute inset-0 rounded-full bg-card shadow-sm ring-1 ring-primary/15 dark:bg-card/90"
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
                       />
                     )}
@@ -112,6 +113,7 @@ export function FloatingNav() {
 
           {/* Right actions */}
           <div className="flex items-center gap-2 shrink-0">
+            <ThemeToggle />
             <NotificationsBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -165,7 +167,7 @@ export function FloatingNav() {
         <div
           className={cn(
             "mx-auto flex max-w-md items-center justify-around gap-1 rounded-2xl px-2 py-2",
-            "border border-primary/10 bg-white/90 shadow-[0_8px_32px_rgba(53,88,114,0.12)] backdrop-blur-xl"
+            "border border-primary/10 bg-card/90 shadow-[0_8px_32px_rgba(53,88,114,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-card/80 dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
           )}
         >
           {mobileItems.map((item) => {

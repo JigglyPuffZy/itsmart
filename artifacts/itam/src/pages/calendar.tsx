@@ -88,10 +88,11 @@ export default function CalendarPage() {
         });
       }
 
-      if ((t as { resolvedAt?: string }).resolvedAt) {
+      const resolvedAt = (t as { resolvedAt?: string }).resolvedAt;
+      if (resolvedAt) {
         evts.push({
           id: `t-res-${t.id}`,
-          date: parseISO((t as { resolvedAt: string }).resolvedAt),
+          date: parseISO(resolvedAt),
           type: "ticket_resolved",
           title: t.title,
           subtitle: "Resolved",
